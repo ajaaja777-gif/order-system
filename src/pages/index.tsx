@@ -1,231 +1,182 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import React, { useState, useEffect } from 'react';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+interface Item {
+  board_type: string;
+  thickness: string;
+  density: string;
+  eco_grade: string;
+  surface_type: string;
+  processing_type: string;
+  pattern: string;
+  width: number;
+  length: number;
+  quantity: number;
+  item_memo: string;
+}
 
 interface Company {
-  id: number;
+  id: string;
   company_name: string;
 }
 
-interface OrderItem {
-  id: string;
-  boardType: string;
-  thickness: string;
-  density: string;
-  ecoGrade: string;
-  surfaceMaterial: string;
-  surfaceSide: string;
-  patternColor: string;
-  width: string;
-  height: string;
-  quantity: number;
-  itemMemo: string;
-}
-
-const BOARD_DATA: Record<string, { thicknesses: string[]; densities: string[]; ecoGrades: string[] }> = {
-  MDF: {
-    thicknesses: ['2.7t', '3t', '4.5t', '6t', '9t', '12t', '15t', '18t', '20t', '22t', '25t', '30t'],
-    densities: ['일반(INT)', 'DL', 'D', 'R'],
-    ecoGrades: ['E1', 'E0', 'SE0'],
-  },
-  PB: {
-    thicknesses: ['9t', '12t', '15t', '18t', '23t', '30t'],
-    densities: ['8형', '11형', '13형', '15형'],
-    ecoGrades: ['E1', 'E0', 'SE0'],
-  },
-  합판: {
-    thicknesses: ['4.8t', '8.5t', '11.5t', '14.5t', '17.5t'],
-    densities: ['일반'],
-    ecoGrades: ['E1', 'E0'],
-  },
-};
-
-const SURFACE_MATERIALS = ['LPM', 'PET', 'UV 코팅', 'PVC', '피니싱포일'];
-
-export default function OrderPage() {
+export default function Home() {
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [companyName, setCompanyName] = useState('');
-  const [dueDate, setDueDate] = useState('');
-  const [memo, setMemo] = useState('');
+  const [selectedCompany, setSelectedCompany] = useState('');
+  const [deliveryDate, setDeliveryDate] = useState('');
+  const [overallMemo, setOverallMemo] = useState('');
 
-  const [items, setItems] = useState<OrderItem[]>([
+  const [items, setItems] = useState<Item[]>([
     {
-      id: '1',
-      boardType: 'MDF',
+      board_type: 'MDF',
       thickness: '18t',
       density: '일반(INT)',
-      ecoGrade: 'E1',
-      surfaceMaterial: 'LPM',
-      surfaceSide: '양면',
-      patternColor: '',
-      width: '1220',
-      height: '2440',
-      quantity: 100,
-      itemMemo: '',
+      eco_grade: 'E1',
+      surface_type: 'LPM',
+      processing_type: '양면',
+      pattern: '',
+      width: 1220,
+      length: 2440,
+      quantity: 1,
+      item_memo: '',
     },
   ]);
 
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
-
   useEffect(() => {
-    const fetchCompanies = async () => {
-      const { data } = await supabase.from('companies').select('id, company_name').order('company_name');
-      if (data) setCompanies(data);
-    };
     fetchCompanies();
   }, []);
+
+  const fetchCompanies = async () => {
+    const { data } = await supabase.from('companies').select('*').order('company_name');
+    if (data) setCompanies(data);
+  };
 
   const addItem = () => {
     setItems([
       ...items,
       {
-        id: Date.now().toString(),
-        boardType: 'MDF',
+        board_type: 'MDF',
         thickness: '18t',
         density: '일반(INT)',
-        ecoGrade: 'E1',
-        surfaceMaterial: 'LPM',
-        surfaceSide: '양면',
-        patternColor: '',
-        width: '1220',
-        height: '2440',
-        quantity: 100,
-        itemMemo: '',
+        eco_grade: 'E1',
+        surface_type: 'LPM',
+        processing_type: '양면',
+        pattern: '',
+        width: 1220,
+        length: 2440,
+        quantity: 1,
+        item_memo: '',
       },
     ]);
   };
 
-  const removeItem = (id: string) => {
+  const removeItem = (index: number) => {
     if (items.length === 1) {
-      alert('최소 1개의 품목이 있어야 합니다.');
+      alert('최소 1개 이상의 품목이 필요합니다.');
       return;
     }
-    setItems(items.filter((item) => item.id !== id));
+    setItems(items.filter((_, i) => i !== index));
   };
 
-  const updateItem = (id: string, field: keyof OrderItem, value: any) => {
-    setItems(
-      items.map((item) => {
-        if (item.id === id) {
-          const updated = { ...item, [field]: value };
-          if (field === 'boardType' && BOARD_DATA[value]) {
-            updated.thickness = BOARD_DATA[value].thicknesses[0];
-            updated.density = BOARD_DATA[value].densities[0];
-            updated.ecoGrade = BOARD_DATA[value].ecoGrades[0];
-          }
-          return updated;
-        }
-        return item;
-      })
-    );
+  const handleItemChange = (index: number, field: keyof Item, value: any) => {
+    const newItems = [...items];
+    newItems[index] = { ...newItems[index], [field]: value };
+    setItems(newItems);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!companyName.trim()) {
-      alert('거래처명을 선택하거나 직접 입력해 주세요.');
+    if (!selectedCompany) {
+      alert('거래처를 선택하거나 직접 입력해 주세요.');
       return;
     }
 
-    setLoading(true);
-    setMessage('');
-
     try {
-      const totalQty = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
-
+      const orderNumber = `ORD-${Date.now().toString().slice(-6)}`;
+      
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .insert([
           {
-            company_name: companyName.trim(),
-            total_quantity: totalQty,
-            due_date: dueDate || null,
-            memo,
-            status: '접수대기',
+            order_number: orderNumber,
+            company_name: selectedCompany,
+            delivery_date: deliveryDate || null,
+            overall_memo: overallMemo,
+            status: '신규접수',
           },
         ])
-        .select();
+        .select()
+        .single();
 
-      if (orderError || !orderData || orderData.length === 0) {
-        throw new Error(orderError?.message || '발주서 등록 오류');
-      }
+      if (orderError) throw orderError;
 
-      const orderId = orderData[0].id;
-
-      const orderItemsData = items.map((item) => ({
-        order_id: orderId,
-        board_type: item.boardType,
+      const orderItemsToInsert = items.map((item) => ({
+        order_id: orderData.id,
+        board_type: item.board_type,
         thickness: item.thickness,
         density: item.density,
-        eco_grade: item.ecoGrade,
-        surface_material: item.surfaceMaterial,
-        surface_side: item.surfaceSide,
-        pattern_color: item.patternColor,
-        width: item.width,
-        height: item.height,
+        eco_grade: item.eco_grade,
+        surface_type: item.surface_type,
+        processing_type: item.processing_type,
+        pattern: item.pattern,
+        width: Number(item.width),
+        length: Number(item.length),
         quantity: Number(item.quantity),
-        memo: item.itemMemo,
+        item_memo: item.item_memo,
       }));
 
-      const { error: itemsError } = await supabase.from('order_items').insert(orderItemsData);
+      const { error: itemsError } = await supabase.from('order_items').insert(orderItemsToInsert);
 
-      if (itemsError) throw new Error(itemsError.message);
+      if (itemsError) throw itemsError;
 
-      setMessage(`✅ ${items.length}개 품목 (총 ${totalQty}장) 발주서가 성공적으로 접수되었습니다!`);
-      setMemo('');
+      alert(`발주서 제출이 완료되었습니다! (발주번호: ${orderNumber})`);
+      setSelectedCompany('');
+      setDeliveryDate('');
+      setOverallMemo('');
       setItems([
         {
-          id: Date.now().toString(),
-          boardType: 'MDF',
+          board_type: 'MDF',
           thickness: '18t',
           density: '일반(INT)',
-          ecoGrade: 'E1',
-          surfaceMaterial: 'LPM',
-          surfaceSide: '양면',
-          patternColor: '',
-          width: '1220',
-          height: '2440',
-          quantity: 100,
-          itemMemo: '',
+          eco_grade: 'E1',
+          surface_type: 'LPM',
+          processing_type: '양면',
+          pattern: '',
+          width: 1220,
+          length: 2440,
+          quantity: 1,
+          item_memo: '',
         },
       ]);
     } catch (err: any) {
       console.error(err);
-      setMessage('❌ 저장에 실패했습니다: ' + err.message);
-    } finally {
-      setLoading(false);
+      alert('발주서 제출 중 오류가 발생했습니다.');
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 py-8 px-4">
-      <div className="max-w-4xl mx-auto bg-white p-8 rounded-xl shadow border border-slate-200">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-slate-800">📋 표면재 가공 발주서 작성</h1>
-          <div className="flex gap-4 text-sm font-semibold">
-            <a href="/companies" className="text-indigo-600 hover:underline">🏢 거래처 관리</a>
-            <a href="/admin" className="text-blue-600 hover:underline">수주 대시보드 $\rightarrow$</a>
-          </div>
-        </div>
+    <div style={{ maxWidth: '900px', margin: '0 auto', padding: '20px', fontFamily: 'sans-serif' }}>
+      <header style={{ marginBottom: '24px', paddingBottom: '12px', borderBottom: '2px solid #333' }}>
+        <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold' }}>📋 표면재 가공 발주서 작성 (발주처용)</h1>
+      </header>
 
-        {message && (
-          <div className={`p-4 mb-6 rounded-lg font-medium text-center ${message.includes('✅') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-            {message}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">거래처 선택 / 직접 입력 *</label>
+      <form onSubmit={handleSubmit}>
+        <div style={{ background: '#f9fafb', padding: '16px', borderRadius: '8px', border: '1px solid #e5e7eb', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: '240px' }}>
+              <label style={{ display: 'block', marginBottom: '6px', fontWeight: 'bold', fontSize: '14px' }}>거래처 선택 / 직접 입력 *</label>
               <input
                 type="text"
                 list="company-list"
-                required
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
                 placeholder="등록된 거래처 검색 또는 직접 입력"
-                className="w-full p-2.5 border rounded bg-white text-slate-800 font-medium"
+                value={selectedCompany}
+                onChange={(e) => setSelectedCompany(e.target.value)}
+                style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+                required
               />
               <datalist id="company-list">
                 {companies.map((c) => (
@@ -234,201 +185,197 @@ export default function OrderPage() {
               </datalist>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">희망 납기일</label>
+            <div style={{ width: '220px' }}>
+              <label style={{ display: 'block', marginBottom: '6px', fontWeight: 'bold', fontSize: '14px' }}>희망 납기일</label>
               <input
                 type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="w-full p-2.5 border rounded bg-white text-slate-800"
+                value={deliveryDate}
+                onChange={(e) => setDeliveryDate(e.target.value)}
+                style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ccc', boxSizing: 'border-box' }}
               />
             </div>
           </div>
+        </div>
 
-          <div className="space-y-4">
-            <div className="flex justify-between items-center border-b pb-2">
-              <h2 className="text-lg font-bold text-slate-800">발주 품목 리스트 ({items.length}건)</h2>
-              <button
-                type="button"
-                onClick={addItem}
-                className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-bold text-sm hover:bg-emerald-700"
-              >
-                + 품목 추가하기
-              </button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <h2 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0 }}>발주 품목 리스트 ({items.length}건)</h2>
+          <button
+            type="button"
+            onClick={addItem}
+            style={{ background: '#059669', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
+          >
+            + 품목 추가하기
+          </button>
+        </div>
+
+        {items.map((item, index) => (
+          <div key={index} style={{ border: '1px solid #d1d5db', borderRadius: '8px', padding: '16px', marginBottom: '16px', background: '#fff' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+              <span style={{ fontWeight: 'bold', color: '#2563eb' }}>품목 #{index + 1}</span>
+              {items.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => removeItem(index)}
+                  style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                >
+                  삭제
+                </button>
+              )}
             </div>
 
-            {items.map((item, index) => (
-              <div key={item.id} className="p-4 border border-slate-300 rounded-lg bg-slate-50/50 space-y-3">
-                <div className="flex justify-between items-center border-b pb-2">
-                  <span className="font-bold text-blue-700">품목 #{index + 1}</span>
-                  {items.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeItem(item.id)}
-                      className="text-xs font-bold text-red-500 hover:text-red-700"
-                    >
-                      ✕ 품목 삭제
-                    </button>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <div>
-                    <label className="block text-xs text-slate-500 mb-1">보드 종류</label>
-                    <select
-                      value={item.boardType}
-                      onChange={(e) => updateItem(item.id, 'boardType', e.target.value)}
-                      className="w-full p-2 border rounded text-slate-800 font-bold bg-white"
-                    >
-                      <option value="MDF">MDF</option>
-                      <option value="PB">PB</option>
-                      <option value="합판">합판</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs text-slate-500 mb-1">두께</label>
-                    <select
-                      value={item.thickness}
-                      onChange={(e) => updateItem(item.id, 'thickness', e.target.value)}
-                      className="w-full p-2 border rounded text-slate-800 bg-white"
-                    >
-                      {BOARD_DATA[item.boardType]?.thicknesses.map((t) => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs text-slate-500 mb-1">비중 규격</label>
-                    <select
-                      value={item.density}
-                      onChange={(e) => updateItem(item.id, 'density', e.target.value)}
-                      className="w-full p-2 border rounded text-slate-800 bg-white"
-                    >
-                      {BOARD_DATA[item.boardType]?.densities.map((d) => (
-                        <option key={d} value={d}>{d}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs text-slate-500 mb-1">환경 등급</label>
-                    <select
-                      value={item.ecoGrade}
-                      onChange={(e) => updateItem(item.id, 'ecoGrade', e.target.value)}
-                      className="w-full p-2 border rounded text-slate-800 bg-white"
-                    >
-                      {BOARD_DATA[item.boardType]?.ecoGrades.map((g) => (
-                        <option key={g} value={g}>{g}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-xs text-slate-500 mb-1">표면재 종류</label>
-                    <select
-                      value={item.surfaceMaterial}
-                      onChange={(e) => updateItem(item.id, 'surfaceMaterial', e.target.value)}
-                      className="w-full p-2 border rounded text-slate-800 bg-white"
-                    >
-                      {SURFACE_MATERIALS.map((m) => (
-                        <option key={m} value={m}>{m}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs text-slate-500 mb-1">가공 구분</label>
-                    <select
-                      value={item.surfaceSide}
-                      onChange={(e) => updateItem(item.id, 'surfaceSide', e.target.value)}
-                      className="w-full p-2 border rounded text-slate-800 bg-white"
-                    >
-                      <option value="양면">양면</option>
-                      <option value="단면">단면</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs text-slate-500 mb-1">패턴 / 색상명</label>
-                    <input
-                      type="text"
-                      value={item.patternColor}
-                      onChange={(e) => updateItem(item.id, 'patternColor', e.target.value)}
-                      placeholder="예: 화이트 무광"
-                      className="w-full p-2 border rounded text-slate-800 bg-white"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
-                  <div>
-                    <label className="block text-xs text-slate-500 mb-1">가로 (mm)</label>
-                    <input
-                      type="text"
-                      value={item.width}
-                      onChange={(e) => updateItem(item.id, 'width', e.target.value)}
-                      className="w-full p-2 border rounded text-slate-800 bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-slate-500 mb-1">세로 (mm)</label>
-                    <input
-                      type="text"
-                      value={item.height}
-                      onChange={(e) => updateItem(item.id, 'height', e.target.value)}
-                      className="w-full p-2 border rounded text-slate-800 bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">수량 (장) *</label>
-                    <input
-                      type="number"
-                      min="1"
-                      required
-                      value={item.quantity}
-                      onChange={(e) => updateItem(item.id, 'quantity', e.target.value)}
-                      className="w-full p-2 border rounded text-slate-800 font-bold bg-white"
-                    />
-                  </div>
-                  <div className="col-span-3 md:col-span-1">
-                    <label className="block text-xs text-slate-500 mb-1">품목 메모</label>
-                    <input
-                      type="text"
-                      value={item.itemMemo}
-                      onChange={(e) => updateItem(item.id, 'itemMemo', e.target.value)}
-                      placeholder="개별 요청사항"
-                      className="w-full p-2 border rounded text-slate-800 bg-white"
-                    />
-                  </div>
-                </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+              <div>
+                <label style={{ fontSize: '12px', color: '#6b7280' }}>보드 종류</label>
+                <select
+                  value={item.board_type}
+                  onChange={(e) => handleItemChange(index, 'board_type', e.target.value)}
+                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                >
+                  <option value="MDF">MDF</option>
+                  <option value="PB">PB</option>
+                  <option value="합판">합판</option>
+                </select>
               </div>
-            ))}
-          </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">전체 발주 메모 / 배송지 요청사항</label>
-            <textarea
-              rows={2}
-              value={memo}
-              onChange={(e) => setMemo(e.target.value)}
-              placeholder="배송 주소 및 하차 방식 등 전체 요청사항"
-              className="w-full p-2.5 border rounded text-slate-800"
-            />
-          </div>
+              <div>
+                <label style={{ fontSize: '12px', color: '#6b7280' }}>두께</label>
+                <select
+                  value={item.thickness}
+                  onChange={(e) => handleItemChange(index, 'thickness', e.target.value)}
+                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                >
+                  <option value="15t">15t</option>
+                  <option value="18t">18t</option>
+                  <option value="25t">25t</option>
+                </select>
+              </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-4 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition"
-          >
-            {loading ? '제출 중...' : `총 ${items.length}개 품목 발주서 제출하기`}
-          </button>
-        </form>
-      </div>
+              <div>
+                <label style={{ fontSize: '12px', color: '#6b7280' }}>비중 규격</label>
+                <select
+                  value={item.density}
+                  onChange={(e) => handleItemChange(index, 'density', e.target.value)}
+                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                >
+                  <option value="일반(INT)">일반(INT)</option>
+                  <option value="고비중">고비중</option>
+                  <option value="방수">방수</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '12px', color: '#6b7280' }}>환경 등급</label>
+                <select
+                  value={item.eco_grade}
+                  onChange={(e) => handleItemChange(index, 'eco_grade', e.target.value)}
+                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                >
+                  <option value="E0">E0</option>
+                  <option value="E1">E1</option>
+                  <option value="SE0">SE0</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '12px', color: '#6b7280' }}>표면재 종류</label>
+                <select
+                  value={item.surface_type}
+                  onChange={(e) => handleItemChange(index, 'surface_type', e.target.value)}
+                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                >
+                  <option value="LPM">LPM</option>
+                  <option value="HPL">HPL</option>
+                  <option value="PET">PET</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '12px', color: '#6b7280' }}>가공 구분</label>
+                <select
+                  value={item.processing_type}
+                  onChange={(e) => handleItemChange(index, 'processing_type', e.target.value)}
+                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                >
+                  <option value="양면">양면</option>
+                  <option value="단면">단면</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '12px', color: '#6b7280' }}>패턴 / 색상명</label>
+                <input
+                  type="text"
+                  placeholder="예: 화이트 무광"
+                  value={item.pattern}
+                  onChange={(e) => handleItemChange(index, 'pattern', e.target.value)}
+                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '12px', color: '#6b7280' }}>가로 (mm)</label>
+                <input
+                  type="number"
+                  value={item.width}
+                  onChange={(e) => handleItemChange(index, 'width', e.target.value)}
+                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '12px', color: '#6b7280' }}>세로 (mm)</label>
+                <input
+                  type="number"
+                  value={item.length}
+                  onChange={(e) => handleItemChange(index, 'length', e.target.value)}
+                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '12px', color: '#6b7280' }}>수량 (장) *</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={item.quantity}
+                  onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+                  required
+                />
+              </div>
+
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={{ fontSize: '12px', color: '#6b7280' }}>품목 메모</label>
+                <input
+                  type="text"
+                  placeholder="개별 요청사항"
+                  value={item.item_memo}
+                  onChange={(e) => handleItemChange(index, 'item_memo', e.target.value)}
+                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+                />
+              </div>
+            </div>
+          </div>
+        ))}
+
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ display: 'block', marginBottom: '6px', fontWeight: 'bold', fontSize: '14px' }}>전체 발주 메모 / 배송지 요청사항</label>
+          <textarea
+            rows={3}
+            placeholder="배송 주소 및 하차 방식 등 전체 요청사항"
+            value={overallMemo}
+            onChange={(e) => setOverallMemo(e.target.value)}
+            style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+          />
+        </div>
+
+        <button
+          type="submit"
+          style={{ width: '100%', background: '#2563eb', color: '#fff', border: 'none', padding: '14px', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}
+        >
+          총 {items.length}개 품목 발주서 제출하기
+        </button>
+      </form>
     </div>
   );
 }
