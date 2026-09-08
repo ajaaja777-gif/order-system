@@ -24,6 +24,23 @@ interface Company {
   company_name: string;
 }
 
+const BOARD_OPTIONS = {
+  MDF: {
+    thicknesses: ['2.7t', '3t', '4.5t', '6t', '12t', '15t', '18t', '20t', '22t', '25t', '30t'],
+    densities: ['INT', 'DL', 'D', 'R'],
+  },
+  PB: {
+    thicknesses: ['9t', '12t', '15t', '18t', '23t', '30t'],
+    densities: ['8형', '11형', '13형', '15형'],
+  },
+  합판: {
+    thicknesses: ['3t', '4.8t', '8.5t', '11.5t', '14.5t', '17.5t'],
+    densities: ['일반', '고비중', '방수'],
+  },
+};
+
+const ECO_GRADES = ['E1', 'E0', 'SE0'];
+
 export default function Home() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [selectedCompany, setSelectedCompany] = useState('');
@@ -34,7 +51,7 @@ export default function Home() {
     {
       board_type: 'MDF',
       thickness: '18t',
-      density: '일반(INT)',
+      density: 'INT',
       eco_grade: 'E1',
       surface_type: 'LPM',
       processing_type: '양면',
@@ -61,7 +78,7 @@ export default function Home() {
       {
         board_type: 'MDF',
         thickness: '18t',
-        density: '일반(INT)',
+        density: 'INT',
         eco_grade: 'E1',
         surface_type: 'LPM',
         processing_type: '양면',
@@ -80,6 +97,18 @@ export default function Home() {
       return;
     }
     setItems(items.filter((_, i) => i !== index));
+  };
+
+  const handleBoardTypeChange = (index: number, newBoardType: string) => {
+    const options = BOARD_OPTIONS[newBoardType as keyof typeof BOARD_OPTIONS] || BOARD_OPTIONS.MDF;
+    const newItems = [...items];
+    newItems[index] = {
+      ...newItems[index],
+      board_type: newBoardType,
+      thickness: options.thicknesses[0],
+      density: options.densities[0],
+    };
+    setItems(newItems);
   };
 
   const handleItemChange = (index: number, field: keyof Item, value: any) => {
@@ -141,7 +170,7 @@ export default function Home() {
         {
           board_type: 'MDF',
           thickness: '18t',
-          density: '일반(INT)',
+          density: 'INT',
           eco_grade: 'E1',
           surface_type: 'LPM',
           processing_type: '양면',
@@ -154,7 +183,7 @@ export default function Home() {
       ]);
     } catch (err: any) {
       console.error(err);
-      alert('발주서 제출 중 오류가 발생했습니다.');
+      alert(`발주서 제출 중 오류가 발생했습니다.\n상세 사유: ${err.message || JSON.stringify(err)}`);
     }
   };
 
@@ -208,155 +237,165 @@ export default function Home() {
           </button>
         </div>
 
-        {items.map((item, index) => (
-          <div key={index} style={{ border: '1px solid #d1d5db', borderRadius: '8px', padding: '16px', marginBottom: '16px', background: '#fff' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-              <span style={{ fontWeight: 'bold', color: '#2563eb' }}>품목 #{index + 1}</span>
-              {items.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => removeItem(index)}
-                  style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
-                >
-                  삭제
-                </button>
-              )}
+        {items.map((item, index) => {
+          const currentOptions = BOARD_OPTIONS[item.board_type as keyof typeof BOARD_OPTIONS] || BOARD_OPTIONS.MDF;
+
+          return (
+            <div key={index} style={{ border: '1px solid #d1d5db', borderRadius: '8px', padding: '16px', marginBottom: '16px', background: '#fff' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                <span style={{ fontWeight: 'bold', color: '#2563eb' }}>품목 #{index + 1}</span>
+                {items.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeItem(index)}
+                    style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                  >
+                    삭제
+                  </button>
+                )}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '12px', color: '#6b7280' }}>보드 종류</label>
+                  <select
+                    value={item.board_type}
+                    onChange={(e) => handleBoardTypeChange(index, e.target.value)}
+                    style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                  >
+                    <option value="MDF">MDF</option>
+                    <option value="PB">PB</option>
+                    <option value="합판">합판</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '12px', color: '#6b7280' }}>두께</label>
+                  <select
+                    value={item.thickness}
+                    onChange={(e) => handleItemChange(index, 'thickness', e.target.value)}
+                    style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                  >
+                    {currentOptions.thicknesses.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '12px', color: '#6b7280' }}>비중 규격</label>
+                  <select
+                    value={item.density}
+                    onChange={(e) => handleItemChange(index, 'density', e.target.value)}
+                    style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                  >
+                    {currentOptions.densities.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '12px', color: '#6b7280' }}>환경 등급</label>
+                  <select
+                    value={item.eco_grade}
+                    onChange={(e) => handleItemChange(index, 'eco_grade', e.target.value)}
+                    style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                  >
+                    {ECO_GRADES.map((g) => (
+                      <option key={g} value={g}>
+                        {g}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '12px', color: '#6b7280' }}>표면재 종류</label>
+                  <select
+                    value={item.surface_type}
+                    onChange={(e) => handleItemChange(index, 'surface_type', e.target.value)}
+                    style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                  >
+                    <option value="LPM">LPM</option>
+                    <option value="HPL">HPL</option>
+                    <option value="PET">PET</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '12px', color: '#6b7280' }}>가공 구분</label>
+                  <select
+                    value={item.processing_type}
+                    onChange={(e) => handleItemChange(index, 'processing_type', e.target.value)}
+                    style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                  >
+                    <option value="양면">양면</option>
+                    <option value="단면">단면</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '12px', color: '#6b7280' }}>패턴 / 색상명</label>
+                  <input
+                    type="text"
+                    placeholder="예: 화이트 무광"
+                    value={item.pattern}
+                    onChange={(e) => handleItemChange(index, 'pattern', e.target.value)}
+                    style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '12px', color: '#6b7280' }}>가로 (mm)</label>
+                  <input
+                    type="number"
+                    value={item.width}
+                    onChange={(e) => handleItemChange(index, 'width', e.target.value)}
+                    style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '12px', color: '#6b7280' }}>세로 (mm)</label>
+                  <input
+                    type="number"
+                    value={item.length}
+                    onChange={(e) => handleItemChange(index, 'length', e.target.value)}
+                    style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '12px', color: '#6b7280' }}>수량 (장) *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={item.quantity}
+                    onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                    style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+                    required
+                  />
+                </div>
+
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ fontSize: '12px', color: '#6b7280' }}>품목 메모</label>
+                  <input
+                    type="text"
+                    placeholder="개별 요청사항"
+                    value={item.item_memo}
+                    onChange={(e) => handleItemChange(index, 'item_memo', e.target.value)}
+                    style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
             </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
-              <div>
-                <label style={{ fontSize: '12px', color: '#6b7280' }}>보드 종류</label>
-                <select
-                  value={item.board_type}
-                  onChange={(e) => handleItemChange(index, 'board_type', e.target.value)}
-                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
-                >
-                  <option value="MDF">MDF</option>
-                  <option value="PB">PB</option>
-                  <option value="합판">합판</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '12px', color: '#6b7280' }}>두께</label>
-                <select
-                  value={item.thickness}
-                  onChange={(e) => handleItemChange(index, 'thickness', e.target.value)}
-                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
-                >
-                  <option value="15t">15t</option>
-                  <option value="18t">18t</option>
-                  <option value="25t">25t</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '12px', color: '#6b7280' }}>비중 규격</label>
-                <select
-                  value={item.density}
-                  onChange={(e) => handleItemChange(index, 'density', e.target.value)}
-                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
-                >
-                  <option value="일반(INT)">일반(INT)</option>
-                  <option value="고비중">고비중</option>
-                  <option value="방수">방수</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '12px', color: '#6b7280' }}>환경 등급</label>
-                <select
-                  value={item.eco_grade}
-                  onChange={(e) => handleItemChange(index, 'eco_grade', e.target.value)}
-                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
-                >
-                  <option value="E0">E0</option>
-                  <option value="E1">E1</option>
-                  <option value="SE0">SE0</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '12px', color: '#6b7280' }}>표면재 종류</label>
-                <select
-                  value={item.surface_type}
-                  onChange={(e) => handleItemChange(index, 'surface_type', e.target.value)}
-                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
-                >
-                  <option value="LPM">LPM</option>
-                  <option value="HPL">HPL</option>
-                  <option value="PET">PET</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '12px', color: '#6b7280' }}>가공 구분</label>
-                <select
-                  value={item.processing_type}
-                  onChange={(e) => handleItemChange(index, 'processing_type', e.target.value)}
-                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
-                >
-                  <option value="양면">양면</option>
-                  <option value="단면">단면</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '12px', color: '#6b7280' }}>패턴 / 색상명</label>
-                <input
-                  type="text"
-                  placeholder="예: 화이트 무광"
-                  value={item.pattern}
-                  onChange={(e) => handleItemChange(index, 'pattern', e.target.value)}
-                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ fontSize: '12px', color: '#6b7280' }}>가로 (mm)</label>
-                <input
-                  type="number"
-                  value={item.width}
-                  onChange={(e) => handleItemChange(index, 'width', e.target.value)}
-                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ fontSize: '12px', color: '#6b7280' }}>세로 (mm)</label>
-                <input
-                  type="number"
-                  value={item.length}
-                  onChange={(e) => handleItemChange(index, 'length', e.target.value)}
-                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ fontSize: '12px', color: '#6b7280' }}>수량 (장) *</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={item.quantity}
-                  onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
-                  required
-                />
-              </div>
-
-              <div style={{ gridColumn: '1 / -1' }}>
-                <label style={{ fontSize: '12px', color: '#6b7280' }}>품목 메모</label>
-                <input
-                  type="text"
-                  placeholder="개별 요청사항"
-                  value={item.item_memo}
-                  onChange={(e) => handleItemChange(index, 'item_memo', e.target.value)}
-                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
-                />
-              </div>
-            </div>
-          </div>
-        ))}
+          );
+        })}
 
         <div style={{ marginBottom: '20px' }}>
           <label style={{ display: 'block', marginBottom: '6px', fontWeight: 'bold', fontSize: '14px' }}>전체 발주 메모 / 배송지 요청사항</label>
