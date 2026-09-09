@@ -23,8 +23,16 @@ interface Item {
 interface Company {
   id: string;
   company_name: string;
-  contact_person?: string;
+  biz_number?: string;
+  address?: string;
   phone?: string;
+  fax?: string;
+  contact_person?: string;
+  contact_phone?: string;
+  position?: string;
+  email?: string;
+  memo?: string;
+  created_at?: string;
 }
 
 interface OrderItem {
@@ -78,7 +86,6 @@ const BOARD_CONFIG = {
   },
 };
 
-const BOARD_SIZES = ['1220x2440', '1220x2800', '1220x3050', '1525x2440', '1830x2440'];
 const ECO_GRADES = ['E1', 'E0', 'SE0'];
 
 const SURFACE_CONFIG: { [key: string]: { unit: '장' | 'm'; thicknesses: string[] } } = {
@@ -120,7 +127,7 @@ export default function MainIntegratedSystem() {
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '16px', fontFamily: 'sans-serif', background: '#f8fafc', minHeight: '100vh' }}>
-      {/* 📌 마스터 헤더 */}
+      {/* 마스터 헤더 */}
       <header style={{ background: '#1e293b', padding: '16px 20px', borderRadius: '12px', color: '#fff', marginBottom: '20px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
           <div>
@@ -143,7 +150,7 @@ export default function MainIntegratedSystem() {
           </div>
         </div>
 
-        {/* 탭 메인 네비게이션 */}
+        {/* 탭 네비게이션 */}
         <nav style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <button
             onClick={() => setActiveTab('order')}
@@ -163,7 +170,6 @@ export default function MainIntegratedSystem() {
             <div style={{ fontSize: '10px', opacity: 0.7, fontWeight: 'normal' }}>발주처 공용</div>
           </button>
 
-          {/* 관리자 모드 시에만 오픈되는 메뉴들 */}
           {isAdminLoggedIn && (
             <>
               <button
@@ -235,14 +241,14 @@ export default function MainIntegratedSystem() {
                 }}
               >
                 <div>🏢 거래처 관리</div>
-                <div style={{ fontSize: '10px', opacity: 0.7, fontWeight: 'normal' }}>거래처 등록</div>
+                <div style={{ fontSize: '10px', opacity: 0.7, fontWeight: 'normal' }}>거래처 상세 등록</div>
               </button>
             </>
           )}
         </nav>
       </header>
 
-      {/* 📌 메인 탭 출력 영역 */}
+      {/* 메인 탭 출력 영역 */}
       <main>
         {activeTab === 'order' && <OrderSection />}
         {isAdminLoggedIn && (
@@ -255,7 +261,7 @@ export default function MainIntegratedSystem() {
         )}
       </main>
 
-      {/* 🔒 관리자 로그인 모달 */}
+      {/* 관리자 로그인 모달 */}
       {showLoginModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
           <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', width: '320px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
@@ -286,7 +292,7 @@ export default function MainIntegratedSystem() {
 }
 
 // ==========================================
-// 1. 발주서 작성 탭 (발주처 전용)
+// 1. 발주서 작성 탭
 // ==========================================
 function OrderSection() {
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -529,7 +535,7 @@ function OrderSection() {
 }
 
 // ==========================================
-// 2. 수주 관리 대시보드 탭 (관리자 전용)
+// 2. 수주 관리 대시보드 탭
 // ==========================================
 function AdminSection() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -628,7 +634,7 @@ function AdminSection() {
 }
 
 // ==========================================
-// 3. 원가 단가 관리 & 실시간 산출기 탭 (관리자 전용)
+// 3. 원가 단가 관리 & 실시간 산출기 탭
 // ==========================================
 function CalculatorSection() {
   const [costDb, setCostDb] = useState<{ [key: string]: number }>({});
@@ -712,7 +718,6 @@ function CalculatorSection() {
         </button>
       </div>
 
-      {/* 보드 단가표 */}
       <div style={{ border: '1px solid #e2e8f0', padding: '16px', borderRadius: '8px', marginBottom: '16px' }}>
         <h3 style={{ fontSize: '15px', margin: '0 0 10px 0', color: '#1e293b' }}>1. 보드 원판 단가 기입 (MDF / PB / 합판)</h3>
         <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
@@ -756,7 +761,6 @@ function CalculatorSection() {
         </div>
       </div>
 
-      {/* 표면재 단가표 */}
       <div style={{ border: '1px solid #e2e8f0', padding: '16px', borderRadius: '8px', marginBottom: '20px' }}>
         <h3 style={{ fontSize: '15px', margin: '0 0 10px 0', color: '#1e293b' }}>2. 표면재 단가 기입 (LPM, PVC, PP, PET, ASA, 포일)</h3>
         <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', flexWrap: 'wrap' }}>
@@ -792,7 +796,6 @@ function CalculatorSection() {
         </table>
       </div>
 
-      {/* 실시간 산출 결과 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
         <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
           <h3 style={{ fontSize: '15px', marginTop: 0 }}>⚙️ 견적 조건 선택</h3>
@@ -876,7 +879,7 @@ function CalculatorSection() {
 }
 
 // ==========================================
-// 4. 견적서 작성 및 A4/PDF 출력 탭 (관리자 전용)
+// 4. 견적서 작성 및 A4/PDF 출력 탭
 // ==========================================
 function EstimateSection() {
   const [items, setItems] = useState<EstimateItem[]>([
@@ -904,11 +907,25 @@ function EstimateSection() {
 }
 
 // ==========================================
-// 5. 거래처 관리 탭 (관리자 전용)
+// 5. 거래처 상세 등록 및 관리 탭 (확장)
 // ==========================================
 function CompaniesSection() {
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [name, setName] = useState('');
+  const [selectedCompanyDetail, setSelectedCompanyDetail] = useState<Company | null>(null);
+
+  // 등록 폼 입력 상태
+  const [form, setForm] = useState({
+    company_name: '',
+    biz_number: '',
+    address: '',
+    phone: '',
+    fax: '',
+    contact_person: '',
+    contact_phone: '',
+    position: '',
+    email: '',
+    memo: '',
+  });
 
   useEffect(() => {
     fetchCompanies();
@@ -919,35 +936,178 @@ function CompaniesSection() {
     if (data) setCompanies(data);
   };
 
-  const handleAdd = async (e: React.FormEvent) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleAddCompany = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name) return;
-    await supabase.from('companies').insert([{ company_name: name }]);
-    setName('');
+    if (!form.company_name.trim()) {
+      alert('거래처명을 입력해 주세요.');
+      return;
+    }
+
+    const { error } = await supabase.from('companies').insert([form]);
+    if (error) {
+      alert(`등록 실패: ${error.message}`);
+    } else {
+      alert('신규 거래처 정보가 성공적으로 등록되었습니다!');
+      setForm({
+        company_name: '',
+        biz_number: '',
+        address: '',
+        phone: '',
+        fax: '',
+        contact_person: '',
+        contact_phone: '',
+        position: '',
+        email: '',
+        memo: '',
+      });
+      fetchCompanies();
+    }
+  };
+
+  const handleDeleteCompany = async (id: string, name: string) => {
+    if (!confirm(`'${name}' 거래처 정보를 완전히 삭제하시겠습니까?`)) return;
+    await supabase.from('companies').delete().eq('id', id);
+    if (selectedCompanyDetail?.id === id) setSelectedCompanyDetail(null);
     fetchCompanies();
   };
 
   return (
     <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-      <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: 0, marginBottom: '16px' }}>🏢 거래처 등록 및 관리 (관리자 전용)</h2>
-      <form onSubmit={handleAdd} style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-        <input type="text" placeholder="신규 거래처명" value={name} onChange={(e) => setName(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc', width: '250px' }} required />
-        <button type="submit" style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>+ 거래처 추가</button>
-      </form>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-        <thead>
-          <tr style={{ background: '#f1f5f9', textAlign: 'left' }}>
-            <th style={{ padding: '8px' }}>등록 거래처명</th>
-          </tr>
-        </thead>
-        <tbody>
-          {companies.map((c) => (
-            <tr key={c.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-              <td style={{ padding: '8px', fontWeight: 'bold' }}>{c.company_name}</td>
+      <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: 0, marginBottom: '16px', color: '#1e293b' }}>🏢 거래처 상세 등록 및 통합 관리</h2>
+
+      {/* 1. 신규 거래처 상세 정보 입력 폼 */}
+      <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '24px' }}>
+        <h3 style={{ fontSize: '15px', fontWeight: 'bold', margin: '0 0 14px 0', color: '#2563eb' }}>✍️ 신규 거래처 등록</h3>
+        <form onSubmit={handleAddCompany}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '12px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>거래처명 *</label>
+              <input type="text" name="company_name" value={form.company_name} onChange={handleInputChange} placeholder="(주)한국목재" style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }} required />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>사업자 등록번호</label>
+              <input type="text" name="biz_number" value={form.biz_number} onChange={handleInputChange} placeholder="000-00-00000" style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>대표 전화번호</label>
+              <input type="text" name="phone" value={form.phone} onChange={handleInputChange} placeholder="02-000-0000" style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>팩스 번호</label>
+              <input type="text" name="fax" value={form.fax} onChange={handleInputChange} placeholder="02-000-0001" style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '12px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>담당자 성명</label>
+              <input type="text" name="contact_person" value={form.contact_person} onChange={handleInputChange} placeholder="홍길동" style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>담당자 직책</label>
+              <input type="text" name="position" value={form.position} onChange={handleInputChange} placeholder="구매팀 과장" style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>담당자 휴대전화</label>
+              <input type="text" name="contact_phone" value={form.contact_phone} onChange={handleInputChange} placeholder="010-0000-0000" style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>이메일 주소</label>
+              <input type="email" name="email" value={form.email} onChange={handleInputChange} placeholder="user@company.com" style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>사업장 주소</label>
+            <input type="text" name="address" value={form.address} onChange={handleInputChange} placeholder="경기도 포천시 ..." style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>비고 / 메모 사항</label>
+            <textarea name="memo" rows={2} value={form.memo} onChange={handleInputChange} placeholder="결제 조건, 특이사항 등 메모" style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
+          </div>
+
+          <button type="submit" style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '14px' }}>
+            + 거래처 정보 저장하기
+          </button>
+        </form>
+      </div>
+
+      {/* 2. 등록된 거래처 전체 목록 */}
+      <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '12px', color: '#1e293b' }}>📋 등록된 거래처 명단 ({companies.length}개사)</h3>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+          <thead>
+            <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #cbd5e1', textAlign: 'left' }}>
+              <th style={{ padding: '8px' }}>거래처명</th>
+              <th style={{ padding: '8px' }}>사업자번호</th>
+              <th style={{ padding: '8px' }}>담당자 (직책)</th>
+              <th style={{ padding: '8px' }}>담당자 연락처</th>
+              <th style={{ padding: '8px' }}>이메일</th>
+              <th style={{ padding: '8px' }}>대표전화</th>
+              <th style={{ padding: '8px' }}>상세/삭제</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {companies.length === 0 ? (
+              <tr>
+                <td colSpan={7} style={{ padding: '16px', textAlign: 'center', color: '#94a3b8' }}>등록된 거래처 정보가 없습니다.</td>
+              </tr>
+            ) : (
+              companies.map((c) => (
+                <tr key={c.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                  <td style={{ padding: '8px', fontWeight: 'bold', color: '#0f172a' }}>{c.company_name}</td>
+                  <td style={{ padding: '8px', color: '#475569' }}>{c.biz_number || '-'}</td>
+                  <td style={{ padding: '8px' }}>{c.contact_person ? `${c.contact_person} ${c.position || ''}` : '-'}</td>
+                  <td style={{ padding: '8px', color: '#2563eb' }}>{c.contact_phone || '-'}</td>
+                  <td style={{ padding: '8px' }}>{c.email || '-'}</td>
+                  <td style={{ padding: '8px' }}>{c.phone || '-'}</td>
+                  <td style={{ padding: '8px', display: 'flex', gap: '4px' }}>
+                    <button onClick={() => setSelectedCompanyDetail(c)} style={{ background: '#0284c7', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>
+                      상세보기
+                    </button>
+                    <button onClick={() => handleDeleteCompany(c.id, c.company_name)} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>
+                      삭제
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* 3. 거래처 상세보기 모달 */}
+      {selectedCompanyDetail && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', maxWidth: '550px', width: '90%', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '2px solid #333', paddingBottom: '8px' }}>
+              <h3 style={{ margin: 0, fontSize: '18px', color: '#1e293b' }}>🏢 {selectedCompanyDetail.company_name} 상세정보</h3>
+              <button onClick={() => setSelectedCompanyDetail(null)} style={{ border: 'none', background: '#ef4444', color: '#fff', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>닫기</button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px', lineHeight: '1.6' }}>
+              <div><strong>사업자 등록번호:</strong> {selectedCompanyDetail.biz_number || '-'}</div>
+              <div><strong>대표 전화번호:</strong> {selectedCompanyDetail.phone || '-'}</div>
+              <div><strong>팩스 번호:</strong> {selectedCompanyDetail.fax || '-'}</div>
+              <div><strong>이메일:</strong> {selectedCompanyDetail.email || '-'}</div>
+              <div><strong>담당자:</strong> {selectedCompanyDetail.contact_person || '-'}</div>
+              <div><strong>담당자 직책:</strong> {selectedCompanyDetail.position || '-'}</div>
+              <div><strong>담당자 연락처:</strong> {selectedCompanyDetail.contact_phone || '-'}</div>
+            </div>
+
+            <div style={{ marginTop: '12px', fontSize: '13px', borderTop: '1px dashed #ccc', paddingTop: '8px' }}>
+              <div><strong>주소:</strong> {selectedCompanyDetail.address || '-'}</div>
+              <div style={{ marginTop: '6px' }}><strong>비고 / 메모:</strong> {selectedCompanyDetail.memo || '-'}</div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
