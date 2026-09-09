@@ -33,16 +33,16 @@ const BOARD_SPECS = {
   },
 };
 
+const BOARD_SIZES = ['1220x2440', '1220x2800', '1220x3050', '1525x2440', '1830x2440'];
 const ECO_GRADES = ['E1', 'E0', 'SE0'];
 
 export default function Calculator() {
   const [costDb, setCostDb] = useState<{ [key: string]: number }>({
-    'MDF_18t_E1': 15000,
-    'MDF_18t_E0': 16500,
-    'MDF_18t_SE0': 18000,
-    'MDF_15t_E1': 13000,
-    'PB_18t_E1': 12000,
-    'PB_18t_E0': 13200,
+    'MDF_18t_1220x2440_E1': 15000,
+    'MDF_18t_1220x2440_E0': 16500,
+    'MDF_18t_1220x2440_SE0': 18000,
+    'MDF_15t_1220x2440_E1': 13000,
+    'PB_18t_1220x2440_E1': 12000,
     'LPM_양면': 5000,
     'LPM_단면': 3000,
     'PROCESSING_BASE': 3000,
@@ -52,6 +52,7 @@ export default function Calculator() {
 
   const [boardType, setBoardType] = useState('MDF');
   const [thickness, setThickness] = useState('18t');
+  const [boardSize, setBoardSize] = useState('1220x2440');
   const [ecoGrade, setEcoGrade] = useState('E1');
   const [selectedSurface, setSelectedSurface] = useState('LPM_양면');
 
@@ -60,9 +61,13 @@ export default function Calculator() {
   const [targetMargin, setTargetMargin] = useState<number>(15);
   const [isEditing, setIsEditing] = useState(false);
 
+  // 커스텀 단가 추가용 폼 상태
+  const [newKey, setNewKey] = useState('');
+  const [newCost, setNewCost] = useState<number | ''>('');
+
   const [competitorList, setCompetitorList] = useState<CompetitorPrice[]>([]);
   const [compName, setCompName] = useState('');
-  const [compBoard, setCompBoard] = useState('MDF 18t E1');
+  const [compBoard, setCompBoard] = useState('MDF 18t 1220x2440 E1');
   const [compSurface, setCompSurface] = useState('LPM 양면');
   const [compPrice, setCompPrice] = useState<number | ''>('');
   const [compMemo, setCompMemo] = useState('');
@@ -100,11 +105,26 @@ export default function Calculator() {
       const { error } = await supabase.from('cost_settings').upsert(updates, { onConflict: 'category' });
       if (error) throw error;
 
-      alert('원가 단가가 정상적으로 저장되었습니다.');
+      alert('규격별 원가 단가가 정상적으로 저장되었습니다.');
       setIsEditing(false);
     } catch (err: any) {
       alert(`단가 저장 중 오류: ${err.message}`);
     }
+  };
+
+  // 새로운 조합 단가 항목 추가
+  const handleAddNewKey = () => {
+    const generatedKey = `${boardType}_${thickness}_${boardSize}_${ecoGrade}`;
+    const targetKey = newKey.trim() || generatedKey;
+
+    setCostDb({
+      ...costDb,
+      [targetKey]: Number(newCost) || 0,
+    });
+
+    setNewKey('');
+    setNewCost('');
+    alert(`'${targetKey}' 항목이 추가되었습니다. 수정 완료 후 [수정사항 DB 저장]을 눌러주세요.`);
   };
 
   const handleAddCompetitorPrice = async (e: React.FormEvent) => {
@@ -141,8 +161,12 @@ export default function Calculator() {
     fetchCompetitorPrices();
   };
 
-  const currentBoardKey = `${boardType}_${thickness}_${ecoGrade}`;
-  const boardUnitCost = costDb[currentBoardKey] || 0;
+  // 현재 선택된 매칭 키 (예: MDF_18t_1220x2440_E1)
+  const currentBoardKey = `${boardType}_${thickness}_${boardSize}_${ecoGrade}`;
+  // 보드 단가 조회 (규격 조합 키가 없는 경우 두께_등급 키 지원)
+  const fallbackKey = `${boardType}_${thickness}_${ecoGrade}`;
+  const boardUnitCost = costDb[currentBoardKey] ?? costDb[fallbackKey] ?? 0;
+
   const surfaceUnitCost = costDb[selectedSurface] || 0;
   const processingUnitCost = costDb['PROCESSING_BASE'] || 0;
   const lossRate = costDb['LOSS_RATE'] || 0;
@@ -168,7 +192,7 @@ export default function Calculator() {
         </div>
       </header>
 
-      {/* 1. 저장된 자재/가공 기본 단가 */}
+      {/* 1. 저장된 자재/가공 기본 단가 관리 */}
       <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '16px', marginBottom: '24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <h2 style={{ fontSize: '16px', fontWeight: 'bold', margin: 0, color: '#1e293b' }}>💾 저장된 규격/등급별 원판 기본 단가</h2>
@@ -183,7 +207,31 @@ export default function Calculator() {
           )}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px', fontSize: '13px' }}>
+        {/* 새 규격 단가 신규 등록 창 (수정 모드 시) */}
+        {isEditing && (
+          <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', padding: '10px', borderRadius: '6px', marginBottom: '12px', display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#1e40af' }}>+ 새 규격 단가 추가:</span>
+            <input
+              type="text"
+              placeholder={`예: ${boardType}_${thickness}_${boardSize}_${ecoGrade}`}
+              value={newKey}
+              onChange={(e) => setNewKey(e.target.value)}
+              style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #93c5fd', fontSize: '12px', width: '220px' }}
+            />
+            <input
+              type="number"
+              placeholder="단가(원)"
+              value={newCost}
+              onChange={(e) => setNewCost(e.target.value === '' ? '' : Number(e.target.value))}
+              style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #93c5fd', fontSize: '12px', width: '100px' }}
+            />
+            <button onClick={handleAddNewKey} style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold' }}>
+              추가
+            </button>
+          </div>
+        )}
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px', fontSize: '13px' }}>
           {Object.keys(costDb).map((key) => (
             <div key={key} style={{ background: '#fff', padding: '8px 12px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
               <div style={{ color: '#64748b', fontSize: '11px', fontWeight: 'bold' }}>{key}</div>
@@ -204,13 +252,13 @@ export default function Calculator() {
         </div>
       </div>
 
-      {/* 2. 세부 규격/등급 분리 선택 및 분석 */}
+      {/* 2. 세부 규격/두께/규격사이즈/등급 선택 및 분석 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginBottom: '32px' }}>
         <div style={{ background: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #d1d5db' }}>
           <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: 0, marginBottom: '16px', color: '#2563eb' }}>📦 품목 규격/등급 설정</h2>
           
           <div style={{ display: 'grid', gap: '12px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
               <div>
                 <label style={{ fontSize: '12px', fontWeight: 'bold' }}>보드 종류</label>
                 <select
@@ -236,6 +284,17 @@ export default function Calculator() {
                   ))}
                 </select>
               </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 'bold' }}>원판 규격 (mm)</label>
+                <select value={boardSize} onChange={(e) => setBoardSize(e.target.value)} style={{ width: '100%', padding: '6px', marginTop: '4px' }}>
+                  {BOARD_SIZES.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
 
               <div>
                 <label style={{ fontSize: '12px', fontWeight: 'bold' }}>환경등급</label>
@@ -248,7 +307,7 @@ export default function Calculator() {
             </div>
 
             <div style={{ background: '#eff6ff', padding: '10px', borderRadius: '6px', fontSize: '13px', color: '#1e40af' }}>
-              매칭 키: <strong>{currentBoardKey}</strong> | 원판 단가: <strong>{boardUnitCost > 0 ? `${boardUnitCost.toLocaleString()}원` : '단가 미등록'}</strong>
+              매칭 키: <strong>{currentBoardKey}</strong> | 원판 단가: <strong>{boardUnitCost > 0 ? `${boardUnitCost.toLocaleString()}원` : '단가 미등록 (상단에서 추가)'}</strong>
             </div>
 
             <div>
@@ -295,7 +354,7 @@ export default function Calculator() {
         <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: 0, marginBottom: '16px', color: '#1e293b' }}>🔍 경쟁사 판매 단가 조사 및 기록</h2>
         <form onSubmit={handleAddCompetitorPrice} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', marginBottom: '20px', background: '#f8fafc', padding: '12px', borderRadius: '6px' }}>
           <input type="text" placeholder="경쟁업체명" value={compName} onChange={(e) => setCompName(e.target.value)} style={{ padding: '8px' }} required />
-          <input type="text" placeholder="규격 (예: MDF 18t E1)" value={compBoard} onChange={(e) => setCompBoard(e.target.value)} style={{ padding: '8px' }} />
+          <input type="text" placeholder="규격 (예: MDF 18t 1220x2440 E1)" value={compBoard} onChange={(e) => setCompBoard(e.target.value)} style={{ padding: '8px' }} />
           <input type="text" placeholder="표면재 (예: LPM 양면)" value={compSurface} onChange={(e) => setCompSurface(e.target.value)} style={{ padding: '8px' }} />
           <input type="number" placeholder="판매 단가" value={compPrice} onChange={(e) => setCompPrice(e.target.value === '' ? '' : Number(e.target.value))} style={{ padding: '8px' }} required />
           <input type="text" placeholder="비고" value={compMemo} onChange={(e) => setCompMemo(e.target.value)} style={{ padding: '8px' }} />
