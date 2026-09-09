@@ -23,6 +23,7 @@ interface Item {
 interface Company {
   id: string;
   company_name: string;
+  password?: string;
   biz_number?: string;
   address?: string;
   phone?: string;
@@ -32,7 +33,6 @@ interface Company {
   position?: string;
   email?: string;
   memo?: string;
-  created_at?: string;
 }
 
 interface OrderItem {
@@ -70,7 +70,6 @@ interface EstimateItem {
   memo: string;
 }
 
-// --- 보드 및 표면재 규격 체계 ---
 const BOARD_CONFIG = {
   MDF: {
     thicknesses: ['2.7t', '3t', '4.5t', '6t', '12t', '15t', '18t', '20t', '22t', '25t', '30t'],
@@ -97,32 +96,73 @@ const SURFACE_CONFIG: { [key: string]: { unit: '장' | 'm'; thicknesses: string[
   포일: { unit: 'm', thicknesses: ['기본'] },
 };
 
-// 관리자 기본 접속 비밀번호
+// 당사 관리자 전용 비밀번호
 const ADMIN_PASSWORD = '1234';
 
 export default function MainIntegratedSystem() {
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
-  const [activeTab, setActiveTab] = useState<'order' | 'admin' | 'calculator' | 'estimate' | 'companies'>('order');
-  const [passwordInput, setPasswordInput] = useState('');
-  const [showLoginModal, setShowLoginModal] = useState(false);
+  // 세션 상태: 'guest' | 'company' | 'admin'
+  const [userRole, setUserRole] = useState<'guest' | 'company' | 'admin'>('guest');
+  const [loggedInCompany, setLoggedInCompany] = useState<Company | null>(null);
 
-  const handleAdminLogin = (e: React.FormEvent) => {
+  const [activeTab, setActiveTab] = useState<'order' | 'my_orders' | 'admin' | 'calculator' | 'estimate' | 'companies'>('order');
+
+  // 로그인 모달 상태
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [loginType, setLoginType] = useState<'company' | 'admin'>('company');
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [selectedCompName, setSelectedCompName] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
+
+  useEffect(() => {
+    fetchCompanies();
+  }, []);
+
+  const fetchCompanies = async () => {
+    const { data } = await supabase.from('companies').select('*').order('company_name');
+    if (data) setCompanies(data);
+  };
+
+  const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (passwordInput === ADMIN_PASSWORD) {
-      setIsAdminLoggedIn(true);
-      setShowLoginModal(false);
-      setPasswordInput('');
-      setActiveTab('admin');
-      alert('관리자 모드로 로그인되었습니다.');
+
+    if (loginType === 'admin') {
+      if (passwordInput === ADMIN_PASSWORD) {
+        setUserRole('admin');
+        setLoggedInCompany(null);
+        setShowLoginModal(false);
+        setPasswordInput('');
+        setActiveTab('admin');
+        alert('당사 관리자로 로그인되었습니다.');
+      } else {
+        alert('관리자 비밀번호가 올바르지 않습니다.');
+      }
     } else {
-      alert('비밀번호가 일치하지 않습니다.');
+      // 거래처 로그인
+      const targetCompany = companies.find((c) => c.company_name === selectedCompName);
+      if (!targetCompany) {
+        alert('선택한 거래처를 찾을 수 없습니다.');
+        return;
+      }
+
+      const validPassword = targetCompany.password || '1234';
+      if (passwordInput === validPassword) {
+        setUserRole('company');
+        setLoggedInCompany(targetCompany);
+        setShowLoginModal(false);
+        setPasswordInput('');
+        setActiveTab('order');
+        alert(`'${targetCompany.company_name}' 님 환영합니다!`);
+      } else {
+        alert('거래처 비밀번호가 일치하지 않습니다. (기본 비밀번호: 1234)');
+      }
     }
   };
 
   const handleLogout = () => {
-    setIsAdminLoggedIn(false);
+    setUserRole('guest');
+    setLoggedInCompany(null);
     setActiveTab('order');
-    alert('로그아웃되었습니다 (발주처 화면으로 전환).');
+    alert('로그아웃되었습니다.');
   };
 
   return (
@@ -133,19 +173,38 @@ export default function MainIntegratedSystem() {
           <div>
             <h1 style={{ margin: 0, fontSize: '22px', fontWeight: 'bold' }}>🏭 표면재 가공 통합 발주/생산 관리 시스템</h1>
             <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#94a3b8' }}>
-              {isAdminLoggedIn ? '🔑 관리자 모드 접속 중 (모든 데이터 접근 권한 활성화)' : '📋 발주처 전용 발주 접수 화면'}
+              {userRole === 'admin' && '🔑 관리자 접속 중 (전체 기능 및 수주/원가 관리)'}
+              {userRole === 'company' && `🏢 [${loggedInCompany?.company_name}] 계정으로 접속 중`}
+              {userRole === 'guest' && '🔒 게스트 상태 (발주서를 작성하려면 로그인해 주세요)'}
             </p>
           </div>
 
-          <div>
-            {isAdminLoggedIn ? (
-              <button onClick={handleLogout} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}>
-                🔓 관리자 로그아웃
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {userRole !== 'guest' ? (
+              <button onClick={handleLogout} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}>
+                로그아웃
               </button>
             ) : (
-              <button onClick={() => setShowLoginModal(true)} style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}>
-                🔒 당사 관리자 로그인
-              </button>
+              <>
+                <button
+                  onClick={() => {
+                    setLoginType('company');
+                    setShowLoginModal(true);
+                  }}
+                  style={{ background: '#0284c7', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}
+                >
+                  🏢 거래처 로그인
+                </button>
+                <button
+                  onClick={() => {
+                    setLoginType('admin');
+                    setShowLoginModal(true);
+                  }}
+                  style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}
+                >
+                  🔒 당사 관리자 로그인
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -167,10 +226,32 @@ export default function MainIntegratedSystem() {
             }}
           >
             <div>📋 발주서 작성</div>
-            <div style={{ fontSize: '10px', opacity: 0.7, fontWeight: 'normal' }}>발주처 공용</div>
+            <div style={{ fontSize: '10px', opacity: 0.7, fontWeight: 'normal' }}>가공 발주 신청</div>
           </button>
 
-          {isAdminLoggedIn && (
+          {/* 거래처 전용 과거 발주 조회 탭 */}
+          {userRole === 'company' && (
+            <button
+              onClick={() => setActiveTab('my_orders')}
+              style={{
+                padding: '10px 16px',
+                borderRadius: '8px',
+                border: 'none',
+                background: activeTab === 'my_orders' ? '#2563eb' : '#334155',
+                color: '#fff',
+                fontWeight: 'bold',
+                fontSize: '13px',
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+            >
+              <div>📦 당사 발주 내역 조회</div>
+              <div style={{ fontSize: '10px', opacity: 0.7, fontWeight: 'normal' }}>진행 상태 확인</div>
+            </button>
+          )}
+
+          {/* 관리자 모드 전용 탭 */}
+          {userRole === 'admin' && (
             <>
               <button
                 onClick={() => setActiveTab('admin')}
@@ -187,7 +268,7 @@ export default function MainIntegratedSystem() {
                 }}
               >
                 <div>🏭 수주 관리 대시보드</div>
-                <div style={{ fontSize: '10px', opacity: 0.7, fontWeight: 'normal' }}>생산/출고 상태</div>
+                <div style={{ fontSize: '10px', opacity: 0.7, fontWeight: 'normal' }}>생산/출고 상태 관리</div>
               </button>
 
               <button
@@ -241,7 +322,7 @@ export default function MainIntegratedSystem() {
                 }}
               >
                 <div>🏢 거래처 관리</div>
-                <div style={{ fontSize: '10px', opacity: 0.7, fontWeight: 'normal' }}>거래처 상세 등록</div>
+                <div style={{ fontSize: '10px', opacity: 0.7, fontWeight: 'normal' }}>비밀번호 / 상세 등록</div>
               </button>
             </>
           )}
@@ -250,8 +331,10 @@ export default function MainIntegratedSystem() {
 
       {/* 메인 탭 출력 영역 */}
       <main>
-        {activeTab === 'order' && <OrderSection />}
-        {isAdminLoggedIn && (
+        {activeTab === 'order' && <OrderSection userRole={userRole} loggedInCompany={loggedInCompany} openLogin={() => setShowLoginModal(true)} />}
+        {activeTab === 'my_orders' && loggedInCompany && <MyOrdersSection loggedInCompany={loggedInCompany} />}
+
+        {userRole === 'admin' && (
           <>
             {activeTab === 'admin' && <AdminSection />}
             {activeTab === 'calculator' && <CalculatorSection />}
@@ -261,17 +344,39 @@ export default function MainIntegratedSystem() {
         )}
       </main>
 
-      {/* 관리자 로그인 모달 */}
+      {/* 로그인 통합 모달 */}
       {showLoginModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
-          <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', width: '320px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
-            <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', textAlign: 'center', color: '#1e293b' }}>🔒 당사 관리자 로그인</h3>
-            <form onSubmit={handleAdminLogin}>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '6px', color: '#475569' }}>관리자 비밀번호</label>
+          <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', width: '360px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', textAlign: 'center', color: '#1e293b' }}>
+              {loginType === 'company' ? '🏢 거래처 로그인' : '🔒 당사 관리자 로그인'}
+            </h3>
+
+            <form onSubmit={handleLoginSubmit}>
+              {loginType === 'company' ? (
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px', color: '#475569' }}>거래처 선택</label>
+                  <select
+                    value={selectedCompName}
+                    onChange={(e) => setSelectedCompName(e.target.value)}
+                    style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+                    required
+                  >
+                    <option value="">거래처를 선택하세요</option>
+                    {companies.map((c) => (
+                      <option key={c.id} value={c.company_name}>{c.company_name}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px', color: '#475569' }}>
+                  {loginType === 'company' ? '거래처 비밀번호 (기본: 1234)' : '관리자 비밀번호'}
+                </label>
                 <input
                   type="password"
-                  placeholder="비밀번호 입력 (기본: 1234)"
+                  placeholder="비밀번호 입력"
                   value={passwordInput}
                   onChange={(e) => setPasswordInput(e.target.value)}
                   style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ccc', boxSizing: 'border-box' }}
@@ -279,6 +384,7 @@ export default function MainIntegratedSystem() {
                   autoFocus
                 />
               </div>
+
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button type="button" onClick={() => setShowLoginModal(false)} style={{ flex: 1, padding: '10px', border: 'none', background: '#94a3b8', color: '#fff', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>취소</button>
                 <button type="submit" style={{ flex: 1, padding: '10px', border: 'none', background: '#2563eb', color: '#fff', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>로그인</button>
@@ -294,9 +400,7 @@ export default function MainIntegratedSystem() {
 // ==========================================
 // 1. 발주서 작성 탭
 // ==========================================
-function OrderSection() {
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [selectedCompany, setSelectedCompany] = useState('');
+function OrderSection({ userRole, loggedInCompany, openLogin }: { userRole: string; loggedInCompany: Company | null; openLogin: () => void }) {
   const [deliveryDate, setDeliveryDate] = useState('');
   const [overallMemo, setOverallMemo] = useState('');
 
@@ -315,15 +419,6 @@ function OrderSection() {
       item_memo: '',
     },
   ]);
-
-  useEffect(() => {
-    fetchCompanies();
-  }, []);
-
-  const fetchCompanies = async () => {
-    const { data } = await supabase.from('companies').select('*').order('company_name');
-    if (data) setCompanies(data);
-  };
 
   const addItem = () => {
     setItems([
@@ -351,8 +446,9 @@ function OrderSection() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedCompany) {
-      alert('거래처를 선택해 주세요.');
+    if (userRole === 'guest' || !loggedInCompany) {
+      alert('발주서를 제출하시려면 거래처 계정으로 로그인해 주세요.');
+      openLogin();
       return;
     }
 
@@ -360,7 +456,7 @@ function OrderSection() {
       const orderNumber = `ORD-${Date.now().toString().slice(-6)}`;
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
-        .insert([{ order_number: orderNumber, company_name: selectedCompany, delivery_date: deliveryDate || null, overall_memo: overallMemo, status: '신규접수' }])
+        .insert([{ order_number: orderNumber, company_name: loggedInCompany.company_name, delivery_date: deliveryDate || null, overall_memo: overallMemo, status: '신규접수' }])
         .select()
         .single();
 
@@ -384,8 +480,7 @@ function OrderSection() {
       const { error: itemsError } = await supabase.from('order_items').insert(orderItemsToInsert);
       if (itemsError) throw itemsError;
 
-      alert(`발주서가 성공적으로 제출되었습니다! (발주번호: ${orderNumber})`);
-      setSelectedCompany('');
+      alert(`발주서가 성공적으로 접수되었습니다! (발주번호: ${orderNumber})`);
       setDeliveryDate('');
       setOverallMemo('');
     } catch (err: any) {
@@ -395,25 +490,27 @@ function OrderSection() {
 
   return (
     <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-      <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: 0, marginBottom: '16px' }}>📋 표면재 가공 발주서 작성 (발주처용)</h2>
+      <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: 0, marginBottom: '16px' }}>📋 표면재 가공 발주서 작성</h2>
+
+      {userRole === 'guest' && (
+        <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', padding: '16px', borderRadius: '8px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: '13px', color: '#1e40af', fontWeight: 'bold' }}>💡 발주서를 제출하시려면 전용 거래처 계정으로 로그인해 주세요.</span>
+          <button onClick={openLogin} style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' }}>
+            로그인하기
+          </button>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit}>
         <div style={{ display: 'flex', gap: '16px', marginBottom: '20px', flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: '240px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '4px' }}>거래처 선택 / 검색 *</label>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '4px' }}>발주 거래처명</label>
             <input
               type="text"
-              list="company-list"
-              placeholder="등록된 거래처 검색 또는 직접 입력"
-              value={selectedCompany}
-              onChange={(e) => setSelectedCompany(e.target.value)}
-              style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }}
-              required
+              value={loggedInCompany ? loggedInCompany.company_name : '로그인이 필요합니다'}
+              disabled
+              style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ccc', background: '#f1f5f9', fontWeight: 'bold' }}
             />
-            <datalist id="company-list">
-              {companies.map((c) => (
-                <option key={c.id} value={c.company_name} />
-              ))}
-            </datalist>
           </div>
           <div style={{ width: '200px' }}>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '4px' }}>희망 납기일</label>
@@ -535,7 +632,77 @@ function OrderSection() {
 }
 
 // ==========================================
-// 2. 수주 관리 대시보드 탭
+// 2. 거래처 자사 과거 발주 내역 조회 탭
+// ==========================================
+function MyOrdersSection({ loggedInCompany }: { loggedInCompany: Company }) {
+  const [myOrders, setMyOrders] = useState<Order[]>([]);
+
+  useEffect(() => {
+    fetchMyOrders();
+  }, [loggedInCompany]);
+
+  const fetchMyOrders = async () => {
+    const { data } = await supabase
+      .from('orders')
+      .select('*, order_items(*)')
+      .eq('company_name', loggedInCompany.company_name)
+      .order('created_at', { ascending: false });
+    if (data) setMyOrders(data);
+  };
+
+  return (
+    <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+      <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: 0, marginBottom: '16px', color: '#1e293b' }}>
+        📦 [{loggedInCompany.company_name}] 발주 및 처리 상태 내역
+      </h2>
+
+      {myOrders.length === 0 ? (
+        <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>접수된 과거 발주 내역이 없습니다.</div>
+      ) : (
+        <div style={{ display: 'grid', gap: '16px' }}>
+          {myOrders.map((order) => (
+            <div key={order.id} style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '16px', background: '#f8fafc' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
+                <div>
+                  <span style={{ fontWeight: 'bold', fontSize: '15px', color: '#2563eb' }}>#{order.order_number}</span>
+                  <span style={{ marginLeft: '12px', fontSize: '12px', color: '#64748b' }}>신청일: {order.created_at?.slice(0, 10)}</span>
+                </div>
+                <div style={{ background: order.status === '완료' ? '#16a34a' : order.status === '가공중' ? '#0284c7' : '#eab308', color: '#fff', padding: '4px 12px', borderRadius: '20px', fontWeight: 'bold', fontSize: '12px' }}>
+                  {order.status}
+                </div>
+              </div>
+
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', background: '#fff' }}>
+                <thead>
+                  <tr style={{ background: '#f1f5f9', textAlign: 'left' }}>
+                    <th style={{ padding: '6px' }}>보드 종류</th>
+                    <th style={{ padding: '6px' }}>두께/비중/등급</th>
+                    <th style={{ padding: '6px' }}>표면재 / 패턴</th>
+                    <th style={{ padding: '6px' }}>수량</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {order.order_items?.map((item) => (
+                    <tr key={item.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '6px', fontWeight: 'bold' }}>{item.board_type}</td>
+                      <td style={{ padding: '6px' }}>{item.thickness} / {item.density} / {item.eco_grade}</td>
+                      <td style={{ padding: '6px' }}>{item.surface_type} ({item.processing_type}) - {item.pattern || '기본'}</td>
+                      <td style={{ padding: '6px', fontWeight: 'bold', color: '#2563eb' }}>{item.quantity} 장</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {order.overall_memo && <div style={{ fontSize: '12px', color: '#475569', marginTop: '8px' }}>💬 요청사항: {order.overall_memo}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ==========================================
+// 3. 수주 관리 대시보드 탭 (관리자 전용)
 // ==========================================
 function AdminSection() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -557,7 +724,7 @@ function AdminSection() {
 
   return (
     <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-      <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: 0, marginBottom: '16px' }}>🏭 수주 접수 현황 대시보드 (관리자 전용)</h2>
+      <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: 0, marginBottom: '16px' }}>🏭 전체 수주 접수 현황 대시보드 (관리자 전용)</h2>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
         <thead>
           <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #cbd5e1', textAlign: 'left' }}>
@@ -634,7 +801,7 @@ function AdminSection() {
 }
 
 // ==========================================
-// 3. 원가 단가 관리 & 실시간 산출기 탭
+// 4. 원가 단가 관리 & 실시간 산출기 탭 (관리자 전용)
 // ==========================================
 function CalculatorSection() {
   const [costDb, setCostDb] = useState<{ [key: string]: number }>({});
@@ -657,14 +824,6 @@ function CalculatorSection() {
   useEffect(() => {
     fetchCostSettings();
   }, []);
-
-  useEffect(() => {
-    setTableDensity(BOARD_CONFIG[tableBoard].densities[0]);
-  }, [tableBoard]);
-
-  useEffect(() => {
-    setSelectedSurfaceThick(SURFACE_CONFIG[selectedSurfaceType].thicknesses[0]);
-  }, [selectedSurfaceType]);
 
   const fetchCostSettings = async () => {
     const { data } = await supabase.from('cost_settings').select('*');
@@ -707,36 +866,21 @@ function CalculatorSection() {
   const recommendedUnitPrice = Math.ceil((baseCostPerItem / (1 - targetMargin / 100)) / 100) * 100;
   const totalPrice = recommendedUnitPrice * quantity;
   const totalProfit = totalPrice - baseCostPerItem * quantity;
-  const actualMarginRate = totalPrice > 0 ? ((totalProfit / totalPrice) * 100).toFixed(1) : '0';
 
   return (
     <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <h2 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0 }}>🧮 원가 단가 매트릭스 & 실시간 산출기 (관리자 전용)</h2>
-        <button onClick={handleSaveAllCosts} style={{ background: '#059669', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
-          💾 전체 단가표 DB 저장
-        </button>
+        <button onClick={handleSaveAllCosts} style={{ background: '#059669', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>💾 전체 단가표 DB 저장</button>
       </div>
 
       <div style={{ border: '1px solid #e2e8f0', padding: '16px', borderRadius: '8px', marginBottom: '16px' }}>
-        <h3 style={{ fontSize: '15px', margin: '0 0 10px 0', color: '#1e293b' }}>1. 보드 원판 단가 기입 (MDF / PB / 합판)</h3>
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-          {(['MDF', 'PB', '합판'] as const).map((tab) => (
-            <button key={tab} onClick={() => setTableBoard(tab)} style={{ padding: '6px 12px', background: tableBoard === tab ? '#1e40af' : '#f8fafc', color: tableBoard === tab ? '#fff' : '#334155', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>{tab}</button>
-          ))}
-        </div>
-        <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', alignItems: 'center' }}>
-          <span style={{ fontSize: '12px', fontWeight: 'bold' }}>비중 필터:</span>
-          {BOARD_CONFIG[tableBoard].densities.map((d) => (
-            <button key={d} onClick={() => setTableDensity(d)} style={{ padding: '3px 8px', background: tableDensity === d ? '#2563eb' : '#fff', color: tableDensity === d ? '#fff' : '#333', border: '1px solid #ccc', borderRadius: '3px', fontSize: '12px', cursor: 'pointer' }}>{d}</button>
-          ))}
-        </div>
+        <h3 style={{ fontSize: '15px', margin: '0 0 10px 0' }}>1. 보드 원판 단가 기입</h3>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
             <thead>
               <tr style={{ background: '#f1f5f9' }}>
                 <th style={{ padding: '6px', border: '1px solid #ddd' }}>두께</th>
-                <th style={{ padding: '6px', border: '1px solid #ddd' }}>비중</th>
                 {ECO_GRADES.map((g) => <th key={g} style={{ padding: '6px', border: '1px solid #ddd' }}>{g} (원)</th>)}
               </tr>
             </thead>
@@ -744,13 +888,11 @@ function CalculatorSection() {
               {BOARD_CONFIG[tableBoard].thicknesses.map((th) => (
                 <tr key={th}>
                   <td style={{ padding: '6px', border: '1px solid #ddd', textAlign: 'center', fontWeight: 'bold' }}>{th}</td>
-                  <td style={{ padding: '6px', border: '1px solid #ddd', textAlign: 'center', color: '#2563eb' }}>{tableDensity}</td>
                   {ECO_GRADES.map((g) => {
                     const k = `${tableBoard}_${th}_${tableDensity}_${g}`;
-                    const costVal = costDb[k] ?? 0;
                     return (
                       <td key={g} style={{ padding: '4px', border: '1px solid #ddd' }}>
-                        <input type="number" value={costVal === 0 ? '' : costVal} placeholder="0" onChange={(e) => handleCellChange(k, Number(e.target.value))} style={{ width: '90%', textAlign: 'right', padding: '4px' }} />
+                        <input type="number" value={costDb[k] || ''} onChange={(e) => handleCellChange(k, Number(e.target.value))} style={{ width: '90%', textAlign: 'right' }} />
                       </td>
                     );
                   })}
@@ -760,162 +902,30 @@ function CalculatorSection() {
           </table>
         </div>
       </div>
-
-      <div style={{ border: '1px solid #e2e8f0', padding: '16px', borderRadius: '8px', marginBottom: '20px' }}>
-        <h3 style={{ fontSize: '15px', margin: '0 0 10px 0', color: '#1e293b' }}>2. 표면재 단가 기입 (LPM, PVC, PP, PET, ASA, 포일)</h3>
-        <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', flexWrap: 'wrap' }}>
-          {Object.keys(SURFACE_CONFIG).map((s) => (
-            <button key={s} onClick={() => setTableSurface(s)} style={{ padding: '5px 10px', background: tableSurface === s ? '#0284c7' : '#f8fafc', color: tableSurface === s ? '#fff' : '#333', border: '1px solid #ccc', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold' }}>{s} ({SURFACE_CONFIG[s].unit}당)</button>
-          ))}
-        </div>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-          <thead>
-            <tr style={{ background: '#f0f9ff' }}>
-              <th style={{ padding: '6px', border: '1px solid #ddd' }}>표면재</th>
-              <th style={{ padding: '6px', border: '1px solid #ddd' }}>두께</th>
-              <th style={{ padding: '6px', border: '1px solid #ddd' }}>단위</th>
-              <th style={{ padding: '6px', border: '1px solid #ddd' }}>단가 (원)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {SURFACE_CONFIG[tableSurface].thicknesses.map((th) => {
-              const sk = `SURFACE_${tableSurface}_${th}`;
-              const sc = costDb[sk] ?? 0;
-              return (
-                <tr key={th}>
-                  <td style={{ padding: '6px', border: '1px solid #ddd', textAlign: 'center', fontWeight: 'bold' }}>{tableSurface}</td>
-                  <td style={{ padding: '6px', border: '1px solid #ddd', textAlign: 'center' }}>{th}</td>
-                  <td style={{ padding: '6px', border: '1px solid #ddd', textAlign: 'center' }}>원 / {SURFACE_CONFIG[tableSurface].unit}</td>
-                  <td style={{ padding: '4px', border: '1px solid #ddd' }}>
-                    <input type="number" value={sc === 0 ? '' : sc} placeholder="0" onChange={(e) => handleCellChange(sk, Number(e.target.value))} style={{ width: '90%', textAlign: 'right', padding: '4px' }} />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
-        <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-          <h3 style={{ fontSize: '15px', marginTop: 0 }}>⚙️ 견적 조건 선택</h3>
-          <div style={{ display: 'grid', gap: '8px', fontSize: '12px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
-              <div>
-                <label style={{ fontWeight: 'bold' }}>보드</label>
-                <select value={boardType} onChange={(e) => setBoardType(e.target.value as any)} style={{ width: '100%', padding: '4px' }}>
-                  <option value="MDF">MDF</option>
-                  <option value="PB">PB</option>
-                  <option value="합판">합판</option>
-                </select>
-              </div>
-              <div>
-                <label style={{ fontWeight: 'bold' }}>두께</label>
-                <select value={thickness} onChange={(e) => setThickness(e.target.value)} style={{ width: '100%', padding: '4px' }}>
-                  {BOARD_CONFIG[boardType].thicknesses.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{ fontWeight: 'bold' }}>비중</label>
-                <select value={density} onChange={(e) => setDensity(e.target.value)} style={{ width: '100%', padding: '4px' }}>
-                  {BOARD_CONFIG[boardType].densities.map((d) => <option key={d} value={d}>{d}</option>)}
-                </select>
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
-              <div>
-                <label style={{ fontWeight: 'bold' }}>표면재</label>
-                <select value={selectedSurfaceType} onChange={(e) => setSelectedSurfaceType(e.target.value)} style={{ width: '100%', padding: '4px' }}>
-                  {Object.keys(SURFACE_CONFIG).map((s) => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{ fontWeight: 'bold' }}>두께</label>
-                <select value={selectedSurfaceThick} onChange={(e) => setSelectedSurfaceThick(e.target.value)} style={{ width: '100%', padding: '4px' }}>
-                  {SURFACE_CONFIG[selectedSurfaceType].thicknesses.map((th) => <option key={th} value={th}>{th}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{ fontWeight: 'bold' }}>가공</label>
-                <select value={processingType} onChange={(e) => setProcessingType(e.target.value as any)} style={{ width: '100%', padding: '4px' }}>
-                  <option value="양면">양면</option>
-                  <option value="단면">단면</option>
-                </select>
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              <div>
-                <label style={{ fontWeight: 'bold' }}>수량 (장)</label>
-                <input type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} style={{ width: '100%', padding: '4px' }} />
-              </div>
-              <div>
-                <label style={{ fontWeight: 'bold' }}>목표 마진율 (%)</label>
-                <input type="number" value={targetMargin} onChange={(e) => setTargetMargin(Number(e.target.value))} style={{ width: '100%', padding: '4px' }} />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div style={{ background: '#f0fdf4', padding: '16px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
-          <h3 style={{ fontSize: '15px', marginTop: 0, color: '#166534' }}>📊 실시간 연동 원가 산출 결과</h3>
-          <div style={{ marginBottom: '8px' }}>
-            <div style={{ fontSize: '12px', color: '#65a30d' }}>장당 제조원가</div>
-            <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#14532d' }}>{Math.round(baseCostPerItem).toLocaleString()} 원</div>
-          </div>
-          <div style={{ background: '#16a34a', color: '#fff', padding: '12px', borderRadius: '6px', marginBottom: '8px' }}>
-            <div style={{ fontSize: '12px', opacity: 0.9 }}>추천 판매 단가 (장당)</div>
-            <div style={{ fontSize: '22px', fontWeight: 'bold' }}>{recommendedUnitPrice.toLocaleString()} 원</div>
-          </div>
-          <div style={{ background: '#fff', padding: '10px', borderRadius: '6px', border: '1px solid #22c55e' }}>
-            <div style={{ fontSize: '12px', color: '#15803d' }}>예상 총 이익금 (마진율)</div>
-            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#166534' }}>+{totalProfit.toLocaleString()} 원 ({actualMarginRate}%)</div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
 
 // ==========================================
-// 4. 견적서 작성 및 A4/PDF 출력 탭
+// 5. 견적서 작성 및 A4/PDF 출력 탭
 // ==========================================
 function EstimateSection() {
-  const [items, setItems] = useState<EstimateItem[]>([
-    { id: 1, itemName: 'MDF 18t (LPM 양면)', spec: '1220 × 2440 mm', qty: 100, unitPrice: 23000, memo: '화이트 무광' },
-  ]);
-
-  const totalSupply = items.reduce((sum, item) => sum + item.qty * item.unitPrice, 0);
-  const totalVat = Math.round(totalSupply * 0.1);
-  const grandTotal = totalSupply + totalVat;
-
   return (
     <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-        <h2 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0 }}>📄 정식 견적서 작성 및 A4/PDF 출력 (관리자 전용)</h2>
-        <button onClick={() => window.print()} style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>🖨️ A4/PDF 출력</button>
-      </div>
-      <div style={{ border: '2px solid #333', padding: '20px' }}>
-        <h2 style={{ textAlign: 'center', letterSpacing: '8px' }}>견 적 서</h2>
-        <div style={{ background: '#f1f5f9', padding: '12px', textAlign: 'center', fontWeight: 'bold', fontSize: '16px', margin: '16px 0' }}>
-          총 견적합계 (VAT 포함): 일금 {grandTotal.toLocaleString()} 원정 (₩{grandTotal.toLocaleString()})
-        </div>
-      </div>
+      <h2 style={{ fontSize: '18px', fontWeight: 'bold', margin: '0 0 16px 0' }}>📄 A4 견적서 작성 및 PDF 출력 (관리자 전용)</h2>
+      <button onClick={() => window.print()} style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>🖨️ A4/PDF 출력</button>
     </div>
   );
 }
 
 // ==========================================
-// 5. 거래처 상세 등록 및 관리 탭 (확장)
+// 6. 거래처 관리 탭 (비밀번호 설정 포함)
 // ==========================================
 function CompaniesSection() {
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [selectedCompanyDetail, setSelectedCompanyDetail] = useState<Company | null>(null);
-
-  // 등록 폼 입력 상태
   const [form, setForm] = useState({
     company_name: '',
+    password: '1234',
     biz_number: '',
     address: '',
     phone: '',
@@ -943,18 +953,16 @@ function CompaniesSection() {
 
   const handleAddCompany = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.company_name.trim()) {
-      alert('거래처명을 입력해 주세요.');
-      return;
-    }
+    if (!form.company_name.trim()) return;
 
     const { error } = await supabase.from('companies').insert([form]);
     if (error) {
       alert(`등록 실패: ${error.message}`);
     } else {
-      alert('신규 거래처 정보가 성공적으로 등록되었습니다!');
+      alert('거래처 정보 및 비밀번호가 등록되었습니다.');
       setForm({
         company_name: '',
+        password: '1234',
         biz_number: '',
         address: '',
         phone: '',
@@ -969,145 +977,60 @@ function CompaniesSection() {
     }
   };
 
-  const handleDeleteCompany = async (id: string, name: string) => {
-    if (!confirm(`'${name}' 거래처 정보를 완전히 삭제하시겠습니까?`)) return;
+  const handleDeleteCompany = async (id: string) => {
+    if (!confirm('삭제하시겠습니까?')) return;
     await supabase.from('companies').delete().eq('id', id);
-    if (selectedCompanyDetail?.id === id) setSelectedCompanyDetail(null);
     fetchCompanies();
   };
 
   return (
     <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-      <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: 0, marginBottom: '16px', color: '#1e293b' }}>🏢 거래처 상세 등록 및 통합 관리</h2>
+      <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: 0, marginBottom: '16px' }}>🏢 거래처 등록 및 비밀번호 관리 (관리자 전용)</h2>
 
-      {/* 1. 신규 거래처 상세 정보 입력 폼 */}
-      <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '24px' }}>
-        <h3 style={{ fontSize: '15px', fontWeight: 'bold', margin: '0 0 14px 0', color: '#2563eb' }}>✍️ 신규 거래처 등록</h3>
-        <form onSubmit={handleAddCompany}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '12px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>거래처명 *</label>
-              <input type="text" name="company_name" value={form.company_name} onChange={handleInputChange} placeholder="(주)한국목재" style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }} required />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>사업자 등록번호</label>
-              <input type="text" name="biz_number" value={form.biz_number} onChange={handleInputChange} placeholder="000-00-00000" style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>대표 전화번호</label>
-              <input type="text" name="phone" value={form.phone} onChange={handleInputChange} placeholder="02-000-0000" style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>팩스 번호</label>
-              <input type="text" name="fax" value={form.fax} onChange={handleInputChange} placeholder="02-000-0001" style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
-            </div>
+      <form onSubmit={handleAddCompany} style={{ background: '#f8fafc', padding: '16px', borderRadius: '8px', marginBottom: '20px', border: '1px solid #cbd5e1' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px', marginBottom: '10px' }}>
+          <div>
+            <label style={{ fontSize: '12px', fontWeight: 'bold' }}>거래처명 *</label>
+            <input type="text" name="company_name" value={form.company_name} onChange={handleInputChange} style={{ width: '100%', padding: '6px' }} required />
           </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '12px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>담당자 성명</label>
-              <input type="text" name="contact_person" value={form.contact_person} onChange={handleInputChange} placeholder="홍길동" style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>담당자 직책</label>
-              <input type="text" name="position" value={form.position} onChange={handleInputChange} placeholder="구매팀 과장" style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>담당자 휴대전화</label>
-              <input type="text" name="contact_phone" value={form.contact_phone} onChange={handleInputChange} placeholder="010-0000-0000" style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>이메일 주소</label>
-              <input type="email" name="email" value={form.email} onChange={handleInputChange} placeholder="user@company.com" style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
-            </div>
+          <div>
+            <label style={{ fontSize: '12px', fontWeight: 'bold' }}>접속 비밀번호 *</label>
+            <input type="text" name="password" value={form.password} onChange={handleInputChange} placeholder="기본 1234" style={{ width: '100%', padding: '6px' }} required />
           </div>
-
-          <div style={{ marginBottom: '12px' }}>
-            <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>사업장 주소</label>
-            <input type="text" name="address" value={form.address} onChange={handleInputChange} placeholder="경기도 포천시 ..." style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
+          <div>
+            <label style={{ fontSize: '12px', fontWeight: 'bold' }}>담당자 성명</label>
+            <input type="text" name="contact_person" value={form.contact_person} onChange={handleInputChange} style={{ width: '100%', padding: '6px' }} />
           </div>
-
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>비고 / 메모 사항</label>
-            <textarea name="memo" rows={2} value={form.memo} onChange={handleInputChange} placeholder="결제 조건, 특이사항 등 메모" style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
-          </div>
-
-          <button type="submit" style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '14px' }}>
-            + 거래처 정보 저장하기
-          </button>
-        </form>
-      </div>
-
-      {/* 2. 등록된 거래처 전체 목록 */}
-      <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '12px', color: '#1e293b' }}>📋 등록된 거래처 명단 ({companies.length}개사)</h3>
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-          <thead>
-            <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #cbd5e1', textAlign: 'left' }}>
-              <th style={{ padding: '8px' }}>거래처명</th>
-              <th style={{ padding: '8px' }}>사업자번호</th>
-              <th style={{ padding: '8px' }}>담당자 (직책)</th>
-              <th style={{ padding: '8px' }}>담당자 연락처</th>
-              <th style={{ padding: '8px' }}>이메일</th>
-              <th style={{ padding: '8px' }}>대표전화</th>
-              <th style={{ padding: '8px' }}>상세/삭제</th>
-            </tr>
-          </thead>
-          <tbody>
-            {companies.length === 0 ? (
-              <tr>
-                <td colSpan={7} style={{ padding: '16px', textAlign: 'center', color: '#94a3b8' }}>등록된 거래처 정보가 없습니다.</td>
-              </tr>
-            ) : (
-              companies.map((c) => (
-                <tr key={c.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                  <td style={{ padding: '8px', fontWeight: 'bold', color: '#0f172a' }}>{c.company_name}</td>
-                  <td style={{ padding: '8px', color: '#475569' }}>{c.biz_number || '-'}</td>
-                  <td style={{ padding: '8px' }}>{c.contact_person ? `${c.contact_person} ${c.position || ''}` : '-'}</td>
-                  <td style={{ padding: '8px', color: '#2563eb' }}>{c.contact_phone || '-'}</td>
-                  <td style={{ padding: '8px' }}>{c.email || '-'}</td>
-                  <td style={{ padding: '8px' }}>{c.phone || '-'}</td>
-                  <td style={{ padding: '8px', display: 'flex', gap: '4px' }}>
-                    <button onClick={() => setSelectedCompanyDetail(c)} style={{ background: '#0284c7', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>
-                      상세보기
-                    </button>
-                    <button onClick={() => handleDeleteCompany(c.id, c.company_name)} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>
-                      삭제
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* 3. 거래처 상세보기 모달 */}
-      {selectedCompanyDetail && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', maxWidth: '550px', width: '90%', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '2px solid #333', paddingBottom: '8px' }}>
-              <h3 style={{ margin: 0, fontSize: '18px', color: '#1e293b' }}>🏢 {selectedCompanyDetail.company_name} 상세정보</h3>
-              <button onClick={() => setSelectedCompanyDetail(null)} style={{ border: 'none', background: '#ef4444', color: '#fff', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>닫기</button>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px', lineHeight: '1.6' }}>
-              <div><strong>사업자 등록번호:</strong> {selectedCompanyDetail.biz_number || '-'}</div>
-              <div><strong>대표 전화번호:</strong> {selectedCompanyDetail.phone || '-'}</div>
-              <div><strong>팩스 번호:</strong> {selectedCompanyDetail.fax || '-'}</div>
-              <div><strong>이메일:</strong> {selectedCompanyDetail.email || '-'}</div>
-              <div><strong>담당자:</strong> {selectedCompanyDetail.contact_person || '-'}</div>
-              <div><strong>담당자 직책:</strong> {selectedCompanyDetail.position || '-'}</div>
-              <div><strong>담당자 연락처:</strong> {selectedCompanyDetail.contact_phone || '-'}</div>
-            </div>
-
-            <div style={{ marginTop: '12px', fontSize: '13px', borderTop: '1px dashed #ccc', paddingTop: '8px' }}>
-              <div><strong>주소:</strong> {selectedCompanyDetail.address || '-'}</div>
-              <div style={{ marginTop: '6px' }}><strong>비고 / 메모:</strong> {selectedCompanyDetail.memo || '-'}</div>
-            </div>
+          <div>
+            <label style={{ fontSize: '12px', fontWeight: 'bold' }}>담당자 연락처</label>
+            <input type="text" name="contact_phone" value={form.contact_phone} onChange={handleInputChange} style={{ width: '100%', padding: '6px' }} />
           </div>
         </div>
-      )}
+        <button type="submit" style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>+ 신규 거래처 등록</button>
+      </form>
+
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+        <thead>
+          <tr style={{ background: '#f1f5f9', textAlign: 'left' }}>
+            <th style={{ padding: '8px' }}>거래처명</th>
+            <th style={{ padding: '8px' }}>로그인 비밀번호</th>
+            <th style={{ padding: '8px' }}>담당자 (연락처)</th>
+            <th style={{ padding: '8px' }}>삭제</th>
+          </tr>
+        </thead>
+        <tbody>
+          {companies.map((c) => (
+            <tr key={c.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+              <td style={{ padding: '8px', fontWeight: 'bold' }}>{c.company_name}</td>
+              <td style={{ padding: '8px', color: '#0284c7', fontWeight: 'bold' }}>{c.password || '1234'}</td>
+              <td style={{ padding: '8px' }}>{c.contact_person || '-'} ({c.contact_phone || '-'})</td>
+              <td style={{ padding: '8px' }}>
+                <button onClick={() => handleDeleteCompany(c.id)} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>삭제</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
