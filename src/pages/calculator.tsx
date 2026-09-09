@@ -36,13 +36,13 @@ const BOARD_SPECS = {
 const ECO_GRADES = ['E1', 'E0', 'SE0'];
 
 export default function Calculator() {
-  // DB 단가 세팅
   const [costDb, setCostDb] = useState<{ [key: string]: number }>({
     'MDF_18t_E1': 15000,
     'MDF_18t_E0': 16500,
     'MDF_18t_SE0': 18000,
     'MDF_15t_E1': 13000,
     'PB_18t_E1': 12000,
+    'PB_18t_E0': 13200,
     'LPM_양면': 5000,
     'LPM_단면': 3000,
     'PROCESSING_BASE': 3000,
@@ -50,18 +50,16 @@ export default function Calculator() {
     'TARGET_MARGIN': 15,
   });
 
-  // 선택된 보드 정보
   const [boardType, setBoardType] = useState('MDF');
   const [thickness, setThickness] = useState('18t');
   const [ecoGrade, setEcoGrade] = useState('E1');
   const [selectedSurface, setSelectedSurface] = useState('LPM_양면');
-  
+
   const [quantity, setQuantity] = useState<number>(100);
   const [transportCost, setTransportCost] = useState<number>(50000);
   const [targetMargin, setTargetMargin] = useState<number>(15);
   const [isEditing, setIsEditing] = useState(false);
 
-  // 경쟁사 단가
   const [competitorList, setCompetitorList] = useState<CompetitorPrice[]>([]);
   const [compName, setCompName] = useState('');
   const [compBoard, setCompBoard] = useState('MDF 18t E1');
@@ -102,10 +100,10 @@ export default function Calculator() {
       const { error } = await supabase.from('cost_settings').upsert(updates, { onConflict: 'category' });
       if (error) throw error;
 
-      alert('원가 단가가 정상 저장되었습니다.');
+      alert('원가 단가가 정상적으로 저장되었습니다.');
       setIsEditing(false);
     } catch (err: any) {
-      alert(`단가 저장 오류: ${err.message}`);
+      alert(`단가 저장 중 오류: ${err.message}`);
     }
   };
 
@@ -129,7 +127,7 @@ export default function Calculator() {
     if (error) {
       alert('경쟁사 단가 저장 실패');
     } else {
-      alert('경쟁사 단가가 저장되었습니다.');
+      alert('경쟁사 단가가 기록되었습니다.');
       setCompName('');
       setCompPrice('');
       setCompMemo('');
@@ -138,12 +136,11 @@ export default function Calculator() {
   };
 
   const handleDeleteCompetitor = async (id: string) => {
-    if (!confirm('삭제하시겠습니까?')) return;
+    if (!confirm('해당 기록을 삭제하시겠습니까?')) return;
     await supabase.from('competitor_prices').delete().eq('id', id);
     fetchCompetitorPrices();
   };
 
-  // 보드 조합 키 생성 (예: MDF_18t_E1)
   const currentBoardKey = `${boardType}_${thickness}_${ecoGrade}`;
   const boardUnitCost = costDb[currentBoardKey] || 0;
   const surfaceUnitCost = costDb[selectedSurface] || 0;
@@ -171,7 +168,7 @@ export default function Calculator() {
         </div>
       </header>
 
-      {/* 1. 보드 규격 및 환경등급별 세부 단가 관리 */}
+      {/* 1. 저장된 자재/가공 기본 단가 */}
       <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '16px', marginBottom: '24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <h2 style={{ fontSize: '16px', fontWeight: 'bold', margin: 0, color: '#1e293b' }}>💾 저장된 규격/등급별 원판 기본 단가</h2>
@@ -207,7 +204,7 @@ export default function Calculator() {
         </div>
       </div>
 
-      {/* 2. 보드 규격/등급 동적 선택 및 원가 산출 */}
+      {/* 2. 세부 규격/등급 분리 선택 및 분석 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginBottom: '32px' }}>
         <div style={{ background: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #d1d5db' }}>
           <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: 0, marginBottom: '16px', color: '#2563eb' }}>📦 품목 규격/등급 설정</h2>
@@ -275,9 +272,9 @@ export default function Calculator() {
           </div>
         </div>
 
-        {/* 원가 분석 결과 */}
+        {/* 원가 및 당사 견적 분석 */}
         <div style={{ background: '#f0fdf4', padding: '20px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
-          <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: 0, marginBottom: '16px', color: '#166534' }}>📊 산출 분석 결과</h2>
+          <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: 0, marginBottom: '16px', color: '#166534' }}>📊 당사 견적 분석</h2>
           <div style={{ background: '#fff', padding: '12px', borderRadius: '6px', marginBottom: '8px', border: '1px solid #dcfce7' }}>
             <div style={{ fontSize: '12px', color: '#65a30d' }}>장당 원가 ({currentBoardKey} 기준)</div>
             <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{Math.round(totalUnitCost).toLocaleString()} 원</div>
@@ -287,15 +284,15 @@ export default function Calculator() {
             <div style={{ fontSize: '22px', fontWeight: 'bold' }}>{recommendedUnitPrice.toLocaleString()} 원</div>
           </div>
           <div style={{ background: '#fff', padding: '12px', borderRadius: '6px', border: '2px solid #22c55e' }}>
-            <div style={{ fontSize: '12px', color: '#15803d' }}>예상 총 이익 금액</div>
-            <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#166534' }}>+{totalProfit.toLocaleString()} 원 ({actualMarginRate}%)</div>
+            <div style={{ fontSize: '12px', color: '#15803d' }}>예상 마진율 (총 이익)</div>
+            <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#166534' }}>{actualMarginRate}% (+{totalProfit.toLocaleString()}원)</div>
           </div>
         </div>
       </div>
 
       {/* 3. 경쟁사 단가 기록 */}
       <div style={{ background: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '20px' }}>
-        <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: 0, marginBottom: '16px', color: '#1e293b' }}>🔍 경쟁사 판매 단가 기록</h2>
+        <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: 0, marginBottom: '16px', color: '#1e293b' }}>🔍 경쟁사 판매 단가 조사 및 기록</h2>
         <form onSubmit={handleAddCompetitorPrice} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', marginBottom: '20px', background: '#f8fafc', padding: '12px', borderRadius: '6px' }}>
           <input type="text" placeholder="경쟁업체명" value={compName} onChange={(e) => setCompName(e.target.value)} style={{ padding: '8px' }} required />
           <input type="text" placeholder="규격 (예: MDF 18t E1)" value={compBoard} onChange={(e) => setCompBoard(e.target.value)} style={{ padding: '8px' }} />
