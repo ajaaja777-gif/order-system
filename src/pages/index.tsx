@@ -70,14 +70,15 @@ interface EstimateItem {
   memo: string;
 }
 
+// --- 규격 체계 ---
 const BOARD_CONFIG = {
   MDF: {
-    thicknesses: ['2.7t', '3t', '4.5t', '6t', '12t', '15t', '18t', '20t', '22t', '25t', '30t'],
+    thicknesses: ['2.7t', '3t', '4.5t', '6t', '9t', '12t', '15t', '18t', '20t', '22t', '23t', '25t', '28t', '30t'],
     densities: ['INT', 'DL', 'D', 'R'],
   },
   PB: {
-    thicknesses: ['9t', '12t', '15t', '18t', '23t', '30t'],
-    densities: ['8형', '11형', '13형', '15형'],
+    thicknesses: ['9t', '12t', '15t', '18t', '20t', '22t', '23t', '25t', '28t', '30t'],
+    densities: ['주방용', '8형', '11형', '13형', '15형'],
   },
   합판: {
     thicknesses: ['3t', '4.8t', '8.5t', '11.5t', '14.5t', '17.5t'],
@@ -89,24 +90,71 @@ const ECO_GRADES = ['E1', 'E0', 'SE0'];
 
 const SURFACE_CONFIG: { [key: string]: { unit: '장' | 'm'; thicknesses: string[] } } = {
   LPM: { unit: '장', thicknesses: ['기본'] },
+  PET: { unit: 'm', thicknesses: ['Special (0.3t)', 'Premium (0.2t)', '일반 (0.15t)', '0.25t'] },
   PVC: { unit: 'm', thicknesses: ['0.07t', '0.09t', '0.1t', '0.12t', '0.15t', '0.17t', '0.2t', '0.25t'] },
-  PP: { unit: 'm', thicknesses: ['0.07t', '0.09t', '0.1t', '0.12t', '0.15t', '0.17t', '0.2t', '0.25t'] },
-  PET: { unit: 'm', thicknesses: ['0.15t', '0.2t', '0.25t', '0.3t'] },
+  PP: { unit: 'm', thicknesses: ['프리미엄 우드', '스톤/헤어라인', '0.07t', '0.1t', '0.12t', '0.15t', '0.2t'] },
   ASA: { unit: 'm', thicknesses: ['0.15t', '0.2t', '0.25t', '0.3t'] },
   포일: { unit: 'm', thicknesses: ['기본'] },
 };
 
-// 당사 관리자 전용 비밀번호
+// PDF 단가표 기반 초기 기본 단가 세트
+const INITIAL_PDF_COSTS: { [key: string]: number } = {
+  // PB 단가 (동화기업/원보드 기반)
+  'PB_12t_13형_E1': 12500,
+  'PB_15t_주방용_E1': 12500,
+  'PB_15t_13형_E1': 12500,
+  'PB_15t_13형_E0': 14000,
+  'PB_15t_15형_E0': 15000,
+  'PB_15t_13형_SE0': 16500,
+  'PB_18t_주방용_E1': 14000,
+  'PB_18t_8형_E1': 14500,
+  'PB_18t_13형_E1': 16000,
+  'PB_18t_15형_E0': 17000,
+  'PB_18t_13형_SE0': 18500,
+  'PB_20t_13형_E0': 15500,
+  'PB_23t_13형_E0': 22500,
+  'PB_23t_15형_E0': 23500,
+  'PB_28t_13형_E0': 29000,
+  'PB_30t_13형_E0': 31500,
+  'PB_30t_15형_E0': 32500,
+
+  // MDF 단가 (태국/중국 원보드/케이원)
+  'MDF_9t_INT_E1': 7000,
+  'MDF_12t_INT_E1': 8600,
+  'MDF_12t_INT_E0': 9000,
+  'MDF_15t_INT_E1': 9700,
+  'MDF_15t_INT_E0': 10400,
+  'MDF_18t_INT_E1': 11700,
+  'MDF_18t_INT_E0': 12500,
+  'MDF_23t_INT_E1': 15200,
+  'MDF_23t_INT_E0': 16000,
+  'MDF_28t_INT_E1': 19500,
+  'MDF_28t_INT_E0': 20500,
+  'MDF_30t_INT_E1': 21000,
+  'MDF_30t_INT_E0': 22000,
+
+  // PET 표면재 (m당 단가) - (주)엘데코 단가표 연동
+  'SURFACE_PET_Special (0.3t)': 9900,
+  'SURFACE_PET_Premium (0.2t)': 8200,
+  'SURFACE_PET_일반 (0.15t)': 6500,
+  'SURFACE_PET_0.25t': 7500,
+
+  // PP 표면재
+  'SURFACE_PP_프리미엄 우드': 13500,
+  'SURFACE_PP_스톤/헤어라인': 10700,
+
+  // 가공 임가공비 및 로스율
+  'PROCESSING_BASE': 3000,
+  'LOSS_RATE': 5,
+};
+
 const ADMIN_PASSWORD = '1234';
 
 export default function MainIntegratedSystem() {
-  // 세션 상태: 'guest' | 'company' | 'admin'
   const [userRole, setUserRole] = useState<'guest' | 'company' | 'admin'>('guest');
   const [loggedInCompany, setLoggedInCompany] = useState<Company | null>(null);
-
   const [activeTab, setActiveTab] = useState<'order' | 'my_orders' | 'admin' | 'calculator' | 'estimate' | 'companies'>('order');
 
-  // 로그인 모달 상태
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [loginType, setLoginType] = useState<'company' | 'admin'>('company');
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -124,7 +172,6 @@ export default function MainIntegratedSystem() {
 
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
     if (loginType === 'admin') {
       if (passwordInput === ADMIN_PASSWORD) {
         setUserRole('admin');
@@ -137,13 +184,11 @@ export default function MainIntegratedSystem() {
         alert('관리자 비밀번호가 올바르지 않습니다.');
       }
     } else {
-      // 거래처 로그인
       const targetCompany = companies.find((c) => c.company_name === selectedCompName);
       if (!targetCompany) {
         alert('선택한 거래처를 찾을 수 없습니다.');
         return;
       }
-
       const validPassword = targetCompany.password || '1234';
       if (passwordInput === validPassword) {
         setUserRole('company');
@@ -153,7 +198,7 @@ export default function MainIntegratedSystem() {
         setActiveTab('order');
         alert(`'${targetCompany.company_name}' 님 환영합니다!`);
       } else {
-        alert('거래처 비밀번호가 일치하지 않습니다. (기본 비밀번호: 1234)');
+        alert('비밀번호가 일치하지 않습니다.');
       }
     }
   };
@@ -167,160 +212,60 @@ export default function MainIntegratedSystem() {
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '16px', fontFamily: 'sans-serif', background: '#f8fafc', minHeight: '100vh' }}>
-      {/* 마스터 헤더 */}
       <header style={{ background: '#1e293b', padding: '16px 20px', borderRadius: '12px', color: '#fff', marginBottom: '20px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
           <div>
             <h1 style={{ margin: 0, fontSize: '22px', fontWeight: 'bold' }}>🏭 표면재 가공 통합 발주/생산 관리 시스템</h1>
             <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#94a3b8' }}>
-              {userRole === 'admin' && '🔑 관리자 접속 중 (전체 기능 및 수주/원가 관리)'}
-              {userRole === 'company' && `🏢 [${loggedInCompany?.company_name}] 계정으로 접속 중`}
-              {userRole === 'guest' && '🔒 게스트 상태 (발주서를 작성하려면 로그인해 주세요)'}
+              {userRole === 'admin' && '🔑 관리자 접속 중 (수주/원가/단가 관리)'}
+              {userRole === 'company' && `🏢 [${loggedInCompany?.company_name}] 접속 중`}
+              {userRole === 'guest' && '🔒 게스트 상태 (발주 신청을 위해 로그인하세요)'}
             </p>
           </div>
 
           <div style={{ display: 'flex', gap: '8px' }}>
             {userRole !== 'guest' ? (
-              <button onClick={handleLogout} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}>
-                로그아웃
-              </button>
+              <button onClick={handleLogout} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}>로그아웃</button>
             ) : (
               <>
-                <button
-                  onClick={() => {
-                    setLoginType('company');
-                    setShowLoginModal(true);
-                  }}
-                  style={{ background: '#0284c7', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}
-                >
-                  🏢 거래처 로그인
-                </button>
-                <button
-                  onClick={() => {
-                    setLoginType('admin');
-                    setShowLoginModal(true);
-                  }}
-                  style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}
-                >
-                  🔒 당사 관리자 로그인
-                </button>
+                <button onClick={() => { setLoginType('company'); setShowLoginModal(true); }} style={{ background: '#0284c7', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}>🏢 거래처 로그인</button>
+                <button onClick={() => { setLoginType('admin'); setShowLoginModal(true); }} style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}>🔒 당사 관리자 로그인</button>
               </>
             )}
           </div>
         </div>
 
-        {/* 탭 네비게이션 */}
         <nav style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <button
-            onClick={() => setActiveTab('order')}
-            style={{
-              padding: '10px 16px',
-              borderRadius: '8px',
-              border: 'none',
-              background: activeTab === 'order' ? '#2563eb' : '#334155',
-              color: '#fff',
-              fontWeight: 'bold',
-              fontSize: '13px',
-              cursor: 'pointer',
-              textAlign: 'left',
-            }}
-          >
+          <button onClick={() => setActiveTab('order')} style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: activeTab === 'order' ? '#2563eb' : '#334155', color: '#fff', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer', textAlign: 'left' }}>
             <div>📋 발주서 작성</div>
             <div style={{ fontSize: '10px', opacity: 0.7, fontWeight: 'normal' }}>가공 발주 신청</div>
           </button>
 
-          {/* 거래처 전용 과거 발주 조회 탭 */}
           {userRole === 'company' && (
-            <button
-              onClick={() => setActiveTab('my_orders')}
-              style={{
-                padding: '10px 16px',
-                borderRadius: '8px',
-                border: 'none',
-                background: activeTab === 'my_orders' ? '#2563eb' : '#334155',
-                color: '#fff',
-                fontWeight: 'bold',
-                fontSize: '13px',
-                cursor: 'pointer',
-                textAlign: 'left',
-              }}
-            >
+            <button onClick={() => setActiveTab('my_orders')} style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: activeTab === 'my_orders' ? '#2563eb' : '#334155', color: '#fff', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer', textAlign: 'left' }}>
               <div>📦 당사 발주 내역 조회</div>
               <div style={{ fontSize: '10px', opacity: 0.7, fontWeight: 'normal' }}>진행 상태 확인</div>
             </button>
           )}
 
-          {/* 관리자 모드 전용 탭 */}
           {userRole === 'admin' && (
             <>
-              <button
-                onClick={() => setActiveTab('admin')}
-                style={{
-                  padding: '10px 16px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: activeTab === 'admin' ? '#2563eb' : '#334155',
-                  color: '#fff',
-                  fontWeight: 'bold',
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                }}
-              >
+              <button onClick={() => setActiveTab('admin')} style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: activeTab === 'admin' ? '#2563eb' : '#334155', color: '#fff', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer', textAlign: 'left' }}>
                 <div>🏭 수주 관리 대시보드</div>
                 <div style={{ fontSize: '10px', opacity: 0.7, fontWeight: 'normal' }}>생산/출고 상태 관리</div>
               </button>
 
-              <button
-                onClick={() => setActiveTab('calculator')}
-                style={{
-                  padding: '10px 16px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: activeTab === 'calculator' ? '#2563eb' : '#334155',
-                  color: '#fff',
-                  fontWeight: 'bold',
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                }}
-              >
+              <button onClick={() => setActiveTab('calculator')} style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: activeTab === 'calculator' ? '#2563eb' : '#334155', color: '#fff', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer', textAlign: 'left' }}>
                 <div>🧮 원가 단가 관리 & 계산기</div>
                 <div style={{ fontSize: '10px', opacity: 0.7, fontWeight: 'normal' }}>단가표 / 마진 산출</div>
               </button>
 
-              <button
-                onClick={() => setActiveTab('estimate')}
-                style={{
-                  padding: '10px 16px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: activeTab === 'estimate' ? '#2563eb' : '#334155',
-                  color: '#fff',
-                  fontWeight: 'bold',
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                }}
-              >
+              <button onClick={() => setActiveTab('estimate')} style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: activeTab === 'estimate' ? '#2563eb' : '#334155', color: '#fff', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer', textAlign: 'left' }}>
                 <div>📄 견적서 작성 및 출력</div>
                 <div style={{ fontSize: '10px', opacity: 0.7, fontWeight: 'normal' }}>A4 정식 견적서</div>
               </button>
 
-              <button
-                onClick={() => setActiveTab('companies')}
-                style={{
-                  padding: '10px 16px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: activeTab === 'companies' ? '#2563eb' : '#334155',
-                  color: '#fff',
-                  fontWeight: 'bold',
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                }}
-              >
+              <button onClick={() => setActiveTab('companies')} style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: activeTab === 'companies' ? '#2563eb' : '#334155', color: '#fff', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer', textAlign: 'left' }}>
                 <div>🏢 거래처 관리</div>
                 <div style={{ fontSize: '10px', opacity: 0.7, fontWeight: 'normal' }}>비밀번호 / 상세 등록</div>
               </button>
@@ -329,7 +274,6 @@ export default function MainIntegratedSystem() {
         </nav>
       </header>
 
-      {/* 메인 탭 출력 영역 */}
       <main>
         {activeTab === 'order' && <OrderSection userRole={userRole} loggedInCompany={loggedInCompany} openLogin={() => setShowLoginModal(true)} />}
         {activeTab === 'my_orders' && loggedInCompany && <MyOrdersSection loggedInCompany={loggedInCompany} />}
@@ -344,47 +288,26 @@ export default function MainIntegratedSystem() {
         )}
       </main>
 
-      {/* 로그인 통합 모달 */}
       {showLoginModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
           <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', width: '360px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
             <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', textAlign: 'center', color: '#1e293b' }}>
               {loginType === 'company' ? '🏢 거래처 로그인' : '🔒 당사 관리자 로그인'}
             </h3>
-
             <form onSubmit={handleLoginSubmit}>
-              {loginType === 'company' ? (
+              {loginType === 'company' && (
                 <div style={{ marginBottom: '12px' }}>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px', color: '#475569' }}>거래처 선택</label>
-                  <select
-                    value={selectedCompName}
-                    onChange={(e) => setSelectedCompName(e.target.value)}
-                    style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ccc', boxSizing: 'border-box' }}
-                    required
-                  >
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>거래처 선택</label>
+                  <select value={selectedCompName} onChange={(e) => setSelectedCompName(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }} required>
                     <option value="">거래처를 선택하세요</option>
-                    {companies.map((c) => (
-                      <option key={c.id} value={c.company_name}>{c.company_name}</option>
-                    ))}
+                    {companies.map((c) => <option key={c.id} value={c.company_name}>{c.company_name}</option>)}
                   </select>
                 </div>
-              ) : null}
-
+              )}
               <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px', color: '#475569' }}>
-                  {loginType === 'company' ? '거래처 비밀번호 (기본: 1234)' : '관리자 비밀번호'}
-                </label>
-                <input
-                  type="password"
-                  placeholder="비밀번호 입력"
-                  value={passwordInput}
-                  onChange={(e) => setPasswordInput(e.target.value)}
-                  style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ccc', boxSizing: 'border-box' }}
-                  required
-                  autoFocus
-                />
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>비밀번호</label>
+                <input type="password" placeholder="비밀번호 입력" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }} required autoFocus />
               </div>
-
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button type="button" onClick={() => setShowLoginModal(false)} style={{ flex: 1, padding: '10px', border: 'none', background: '#94a3b8', color: '#fff', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>취소</button>
                 <button type="submit" style={{ flex: 1, padding: '10px', border: 'none', background: '#2563eb', color: '#fff', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>로그인</button>
@@ -403,40 +326,12 @@ export default function MainIntegratedSystem() {
 function OrderSection({ userRole, loggedInCompany, openLogin }: { userRole: string; loggedInCompany: Company | null; openLogin: () => void }) {
   const [deliveryDate, setDeliveryDate] = useState('');
   const [overallMemo, setOverallMemo] = useState('');
-
   const [items, setItems] = useState<Item[]>([
-    {
-      board_type: 'MDF',
-      thickness: '18t',
-      density: 'INT',
-      eco_grade: 'E1',
-      surface_type: 'LPM',
-      processing_type: '양면',
-      pattern: '',
-      width: 1220,
-      length: 2440,
-      quantity: 1,
-      item_memo: '',
-    },
+    { board_type: 'MDF', thickness: '18t', density: 'INT', eco_grade: 'E1', surface_type: 'PET', processing_type: '양면', pattern: '매트 스노우화이트', width: 1220, length: 2440, quantity: 1, item_memo: '' }
   ]);
 
   const addItem = () => {
-    setItems([
-      ...items,
-      {
-        board_type: 'MDF',
-        thickness: '18t',
-        density: 'INT',
-        eco_grade: 'E1',
-        surface_type: 'LPM',
-        processing_type: '양면',
-        pattern: '',
-        width: 1220,
-        length: 2440,
-        quantity: 1,
-        item_memo: '',
-      },
-    ]);
+    setItems([...items, { board_type: 'MDF', thickness: '18t', density: 'INT', eco_grade: 'E1', surface_type: 'PET', processing_type: '양면', pattern: '', width: 1220, length: 2440, quantity: 1, item_memo: '' }]);
   };
 
   const removeItem = (index: number) => {
@@ -457,8 +352,7 @@ function OrderSection({ userRole, loggedInCompany, openLogin }: { userRole: stri
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .insert([{ order_number: orderNumber, company_name: loggedInCompany.company_name, delivery_date: deliveryDate || null, overall_memo: overallMemo, status: '신규접수' }])
-        .select()
-        .single();
+        .select().single();
 
       if (orderError) throw orderError;
 
@@ -491,13 +385,10 @@ function OrderSection({ userRole, loggedInCompany, openLogin }: { userRole: stri
   return (
     <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
       <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: 0, marginBottom: '16px' }}>📋 표면재 가공 발주서 작성</h2>
-
       {userRole === 'guest' && (
         <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', padding: '16px', borderRadius: '8px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: '13px', color: '#1e40af', fontWeight: 'bold' }}>💡 발주서를 제출하시려면 전용 거래처 계정으로 로그인해 주세요.</span>
-          <button onClick={openLogin} style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' }}>
-            로그인하기
-          </button>
+          <span style={{ fontSize: '13px', color: '#1e40af', fontWeight: 'bold' }}>💡 발주서를 제출하시려면 거래처 계정으로 로그인해 주세요.</span>
+          <button onClick={openLogin} style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' }}>로그인하기</button>
         </div>
       )}
 
@@ -505,12 +396,7 @@ function OrderSection({ userRole, loggedInCompany, openLogin }: { userRole: stri
         <div style={{ display: 'flex', gap: '16px', marginBottom: '20px', flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: '240px' }}>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '4px' }}>발주 거래처명</label>
-            <input
-              type="text"
-              value={loggedInCompany ? loggedInCompany.company_name : '로그인이 필요합니다'}
-              disabled
-              style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ccc', background: '#f1f5f9', fontWeight: 'bold' }}
-            />
+            <input type="text" value={loggedInCompany ? loggedInCompany.company_name : '로그인이 필요합니다'} disabled style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ccc', background: '#f1f5f9', fontWeight: 'bold' }} />
           </div>
           <div style={{ width: '200px' }}>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '4px' }}>희망 납기일</label>
@@ -528,21 +414,17 @@ function OrderSection({ userRole, loggedInCompany, openLogin }: { userRole: stri
                   <button type="button" onClick={() => removeItem(index)} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>삭제</button>
                 )}
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
                 <div>
                   <label style={{ fontSize: '11px', color: '#64748b' }}>보드 종류</label>
-                  <select
-                    value={item.board_type}
-                    onChange={(e) => {
-                      const newType = e.target.value as keyof typeof BOARD_CONFIG;
-                      const newItems = [...items];
-                      newItems[index].board_type = newType;
-                      newItems[index].thickness = BOARD_CONFIG[newType].thicknesses[0];
-                      newItems[index].density = BOARD_CONFIG[newType].densities[0];
-                      setItems(newItems);
-                    }}
-                    style={{ width: '100%', padding: '6px' }}
-                  >
+                  <select value={item.board_type} onChange={(e) => {
+                    const newType = e.target.value as keyof typeof BOARD_CONFIG;
+                    const newItems = [...items];
+                    newItems[index].board_type = newType;
+                    newItems[index].thickness = BOARD_CONFIG[newType].thicknesses[0];
+                    newItems[index].density = BOARD_CONFIG[newType].densities[0];
+                    setItems(newItems);
+                  }} style={{ width: '100%', padding: '6px' }}>
                     <option value="MDF">MDF</option>
                     <option value="PB">PB</option>
                     <option value="합판">합판</option>
@@ -601,7 +483,7 @@ function OrderSection({ userRole, loggedInCompany, openLogin }: { userRole: stri
                 </div>
                 <div>
                   <label style={{ fontSize: '11px', color: '#64748b' }}>패턴 / 색상명</label>
-                  <input type="text" placeholder="예: 화이트 무광" value={item.pattern} onChange={(e) => {
+                  <input type="text" placeholder="예: 매트 스노우화이트" value={item.pattern} onChange={(e) => {
                     const newItems = [...items];
                     newItems[index].pattern = e.target.value;
                     setItems(newItems);
@@ -632,7 +514,7 @@ function OrderSection({ userRole, loggedInCompany, openLogin }: { userRole: stri
 }
 
 // ==========================================
-// 2. 거래처 자사 과거 발주 내역 조회 탭
+// 2. 거래처 자사 발주 내역 조회 탭
 // ==========================================
 function MyOrdersSection({ loggedInCompany }: { loggedInCompany: Company }) {
   const [myOrders, setMyOrders] = useState<Order[]>([]);
@@ -642,11 +524,7 @@ function MyOrdersSection({ loggedInCompany }: { loggedInCompany: Company }) {
   }, [loggedInCompany]);
 
   const fetchMyOrders = async () => {
-    const { data } = await supabase
-      .from('orders')
-      .select('*, order_items(*)')
-      .eq('company_name', loggedInCompany.company_name)
-      .order('created_at', { ascending: false });
+    const { data } = await supabase.from('orders').select('*, order_items(*)').eq('company_name', loggedInCompany.company_name).order('created_at', { ascending: false });
     if (data) setMyOrders(data);
   };
 
@@ -655,7 +533,6 @@ function MyOrdersSection({ loggedInCompany }: { loggedInCompany: Company }) {
       <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: 0, marginBottom: '16px', color: '#1e293b' }}>
         📦 [{loggedInCompany.company_name}] 발주 및 처리 상태 내역
       </h2>
-
       {myOrders.length === 0 ? (
         <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>접수된 과거 발주 내역이 없습니다.</div>
       ) : (
@@ -671,7 +548,6 @@ function MyOrdersSection({ loggedInCompany }: { loggedInCompany: Company }) {
                   {order.status}
                 </div>
               </div>
-
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', background: '#fff' }}>
                 <thead>
                   <tr style={{ background: '#f1f5f9', textAlign: 'left' }}>
@@ -692,7 +568,6 @@ function MyOrdersSection({ loggedInCompany }: { loggedInCompany: Company }) {
                   ))}
                 </tbody>
               </table>
-              {order.overall_memo && <div style={{ fontSize: '12px', color: '#475569', marginTop: '8px' }}>💬 요청사항: {order.overall_memo}</div>}
             </div>
           ))}
         </div>
@@ -706,7 +581,6 @@ function MyOrdersSection({ loggedInCompany }: { loggedInCompany: Company }) {
 // ==========================================
 function AdminSection() {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   useEffect(() => {
     fetchOrders();
@@ -731,19 +605,16 @@ function AdminSection() {
             <th style={{ padding: '8px' }}>발주번호</th>
             <th style={{ padding: '8px' }}>거래처명</th>
             <th style={{ padding: '8px' }}>접수일시</th>
-            <th style={{ padding: '8px' }}>희망납기일</th>
             <th style={{ padding: '8px' }}>품목수</th>
             <th style={{ padding: '8px' }}>진행 상태</th>
-            <th style={{ padding: '8px' }}>상세</th>
           </tr>
         </thead>
         <tbody>
           {orders.map((o) => (
             <tr key={o.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
               <td style={{ padding: '8px', fontWeight: 'bold' }}>{o.order_number}</td>
-              <td style={{ padding: '8px', fontWeight: 'bold', color: '#0f172a' }}>{o.company_name}</td>
+              <td style={{ padding: '8px', fontWeight: 'bold' }}>{o.company_name}</td>
               <td style={{ padding: '8px', color: '#64748b' }}>{o.created_at?.slice(0, 10)}</td>
-              <td style={{ padding: '8px' }}>{o.delivery_date || '-'}</td>
               <td style={{ padding: '8px' }}>{o.order_items?.length || 0}건</td>
               <td style={{ padding: '8px' }}>
                 <select value={o.status} onChange={(e) => updateStatus(o.id, e.target.value)} style={{ padding: '4px', borderRadius: '4px', fontWeight: 'bold' }}>
@@ -753,71 +624,32 @@ function AdminSection() {
                   <option value="완료">완료</option>
                 </select>
               </td>
-              <td style={{ padding: '8px' }}>
-                <button onClick={() => setSelectedOrder(o)} style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>보기</button>
-              </td>
             </tr>
           ))}
         </tbody>
       </table>
-
-      {selectedOrder && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ background: '#fff', padding: '24px', borderRadius: '8px', maxWidth: '700px', width: '90%', maxHeight: '80vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <h3 style={{ margin: 0 }}>발주서 상세 #{selectedOrder.order_number}</h3>
-              <button onClick={() => setSelectedOrder(null)} style={{ border: 'none', background: '#ef4444', color: '#fff', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer' }}>닫기</button>
-            </div>
-            <p><strong>거래처:</strong> {selectedOrder.company_name} | <strong>요청메모:</strong> {selectedOrder.overall_memo || '없음'}</p>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-              <thead>
-                <tr style={{ background: '#f1f5f9' }}>
-                  <th style={{ padding: '6px', border: '1px solid #ddd' }}>보드</th>
-                  <th style={{ padding: '6px', border: '1px solid #ddd' }}>두께</th>
-                  <th style={{ padding: '6px', border: '1px solid #ddd' }}>비중</th>
-                  <th style={{ padding: '6px', border: '1px solid #ddd' }}>표면재</th>
-                  <th style={{ padding: '6px', border: '1px solid #ddd' }}>패턴</th>
-                  <th style={{ padding: '6px', border: '1px solid #ddd' }}>수량</th>
-                </tr>
-              </thead>
-              <tbody>
-                {selectedOrder.order_items.map((item) => (
-                  <tr key={item.id}>
-                    <td style={{ padding: '6px', border: '1px solid #ddd' }}>{item.board_type}</td>
-                    <td style={{ padding: '6px', border: '1px solid #ddd' }}>{item.thickness}</td>
-                    <td style={{ padding: '6px', border: '1px solid #ddd' }}>{item.density}</td>
-                    <td style={{ padding: '6px', border: '1px solid #ddd' }}>{item.surface_type} ({item.processing_type})</td>
-                    <td style={{ padding: '6px', border: '1px solid #ddd' }}>{item.pattern || '-'}</td>
-                    <td style={{ padding: '6px', border: '1px solid #ddd', fontWeight: 'bold' }}>{item.quantity}장</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
 // ==========================================
-// 4. 원가 단가 관리 & 실시간 산출기 탭 (관리자 전용)
+// 4. 원가 단가 관리 & 실시간 산출기 탭 (마스터 보완)
 // ==========================================
 function CalculatorSection() {
-  const [costDb, setCostDb] = useState<{ [key: string]: number }>({});
+  const [costDb, setCostDb] = useState<{ [key: string]: number }>(INITIAL_PDF_COSTS);
   const [tableBoard, setTableBoard] = useState<'MDF' | 'PB' | '합판'>('MDF');
   const [tableDensity, setTableDensity] = useState<string>('INT');
-  const [tableSurface, setTableSurface] = useState<string>('PVC');
+  const [tableSurface, setTableSurface] = useState<string>('PET');
 
+  // 실시간 계산 조건
   const [boardType, setBoardType] = useState<'MDF' | 'PB' | '합판'>('MDF');
   const [thickness, setThickness] = useState('18t');
   const [density, setDensity] = useState('INT');
   const [ecoGrade, setEcoGrade] = useState('E1');
 
-  const [selectedSurfaceType, setSelectedSurfaceType] = useState('LPM');
-  const [selectedSurfaceThick, setSelectedSurfaceThick] = useState('기본');
+  const [selectedSurfaceType, setSelectedSurfaceType] = useState('PET');
+  const [selectedSurfaceThick, setSelectedSurfaceThick] = useState('Special (0.3t)');
   const [processingType, setProcessingType] = useState<'양면' | '단면'>('양면');
-
   const [quantity, setQuantity] = useState<number>(100);
   const [targetMargin, setTargetMargin] = useState<number>(15);
 
@@ -825,10 +657,18 @@ function CalculatorSection() {
     fetchCostSettings();
   }, []);
 
+  useEffect(() => {
+    setTableDensity(BOARD_CONFIG[tableBoard].densities[0]);
+  }, [tableBoard]);
+
+  useEffect(() => {
+    setSelectedSurfaceThick(SURFACE_CONFIG[selectedSurfaceType].thicknesses[0]);
+  }, [selectedSurfaceType]);
+
   const fetchCostSettings = async () => {
     const { data } = await supabase.from('cost_settings').select('*');
-    if (data) {
-      const dbMap: { [key: string]: number } = {};
+    if (data && data.length > 0) {
+      const dbMap: { [key: string]: number } = { ...INITIAL_PDF_COSTS };
       data.forEach((item: any) => { dbMap[item.category] = Number(item.unit_cost); });
       setCostDb(dbMap);
     }
@@ -841,7 +681,7 @@ function CalculatorSection() {
   const handleSaveAllCosts = async () => {
     const updates = Object.keys(costDb).map((key) => ({ category: key, unit_cost: costDb[key], updated_at: new Date().toISOString() }));
     await supabase.from('cost_settings').upsert(updates, { onConflict: 'category' });
-    alert('보드 및 표면재 전체 원가 단가가 DB에 성공적으로 저장되었습니다!');
+    alert('보드 및 PET 표면재 전체 원가 단가가 DB에 성공적으로 저장되었습니다!');
   };
 
   const fullDensityKey = `${boardType}_${thickness}_${density}_${ecoGrade}`;
@@ -866,33 +706,58 @@ function CalculatorSection() {
   const recommendedUnitPrice = Math.ceil((baseCostPerItem / (1 - targetMargin / 100)) / 100) * 100;
   const totalPrice = recommendedUnitPrice * quantity;
   const totalProfit = totalPrice - baseCostPerItem * quantity;
+  const actualMarginRate = totalPrice > 0 ? ((totalProfit / totalPrice) * 100).toFixed(1) : '0';
 
   return (
     <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <h2 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0 }}>🧮 원가 단가 매트릭스 & 실시간 산출기 (관리자 전용)</h2>
-        <button onClick={handleSaveAllCosts} style={{ background: '#059669', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>💾 전체 단가표 DB 저장</button>
+        <button onClick={handleSaveAllCosts} style={{ background: '#059669', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
+          💾 전체 단가표 DB 저장
+        </button>
       </div>
 
-      <div style={{ border: '1px solid #e2e8f0', padding: '16px', borderRadius: '8px', marginBottom: '16px' }}>
-        <h3 style={{ fontSize: '15px', margin: '0 0 10px 0' }}>1. 보드 원판 단가 기입</h3>
+      {/* 1. 보드 단가표 입력 매트릭스 */}
+      <div style={{ border: '1px solid #e2e8f0', padding: '16px', borderRadius: '8px', marginBottom: '20px' }}>
+        <h3 style={{ fontSize: '15px', margin: '0 0 10px 0', color: '#1e293b' }}>1. 보드 원판 단가 기입 (MDF / PB / 합판)</h3>
+        
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+          {(['MDF', 'PB', '합판'] as const).map((tab) => (
+            <button key={tab} onClick={() => setTableBoard(tab)} style={{ padding: '6px 14px', background: tableBoard === tab ? '#1e40af' : '#f8fafc', color: tableBoard === tab ? '#fff' : '#334155', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+              {tab} 단가표
+            </button>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', alignItems: 'center', background: '#f8fafc', padding: '6px 10px', borderRadius: '6px' }}>
+          <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569' }}>비중 필터:</span>
+          {BOARD_CONFIG[tableBoard].densities.map((d) => (
+            <button key={d} onClick={() => setTableDensity(d)} style={{ padding: '4px 10px', background: tableDensity === d ? '#2563eb' : '#fff', color: tableDensity === d ? '#fff' : '#333', border: '1px solid #ccc', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold' }}>
+              {d}
+            </button>
+          ))}
+        </div>
+
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
             <thead>
-              <tr style={{ background: '#f1f5f9' }}>
-                <th style={{ padding: '6px', border: '1px solid #ddd' }}>두께</th>
-                {ECO_GRADES.map((g) => <th key={g} style={{ padding: '6px', border: '1px solid #ddd' }}>{g} (원)</th>)}
+              <tr style={{ background: '#f1f5f9', borderTop: '2px solid #cbd5e1' }}>
+                <th style={{ padding: '8px', border: '1px solid #ddd', width: '100px' }}>두께</th>
+                <th style={{ padding: '8px', border: '1px solid #ddd', width: '100px' }}>비중</th>
+                {ECO_GRADES.map((g) => <th key={g} style={{ padding: '8px', border: '1px solid #ddd' }}>{g} 단가 (원)</th>)}
               </tr>
             </thead>
             <tbody>
               {BOARD_CONFIG[tableBoard].thicknesses.map((th) => (
                 <tr key={th}>
-                  <td style={{ padding: '6px', border: '1px solid #ddd', textAlign: 'center', fontWeight: 'bold' }}>{th}</td>
+                  <td style={{ padding: '6px', border: '1px solid #ddd', textAlign: 'center', fontWeight: 'bold', background: '#f8fafc' }}>{th}</td>
+                  <td style={{ padding: '6px', border: '1px solid #ddd', textAlign: 'center', color: '#2563eb', fontWeight: 'bold' }}>{tableDensity}</td>
                   {ECO_GRADES.map((g) => {
                     const k = `${tableBoard}_${th}_${tableDensity}_${g}`;
+                    const costVal = costDb[k] ?? 0;
                     return (
                       <td key={g} style={{ padding: '4px', border: '1px solid #ddd' }}>
-                        <input type="number" value={costDb[k] || ''} onChange={(e) => handleCellChange(k, Number(e.target.value))} style={{ width: '90%', textAlign: 'right' }} />
+                        <input type="number" value={costVal === 0 ? '' : costVal} placeholder="0" onChange={(e) => handleCellChange(k, Number(e.target.value))} style={{ width: '95%', textAlign: 'right', padding: '4px', borderRadius: '4px', border: '1px solid #ccc' }} />
                       </td>
                     );
                   })}
@@ -900,6 +765,126 @@ function CalculatorSection() {
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* 2. 표면재 단가표 입력 매트릭스 (PET 포함) */}
+      <div style={{ border: '1px solid #e2e8f0', padding: '16px', borderRadius: '8px', marginBottom: '24px' }}>
+        <h3 style={{ fontSize: '15px', margin: '0 0 10px 0', color: '#1e293b' }}>2. 표면재 단가 기입 (PET / LPM / PVC / PP / ASA / 포일)</h3>
+        
+        <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' }}>
+          {Object.keys(SURFACE_CONFIG).map((s) => (
+            <button key={s} onClick={() => setTableSurface(s)} style={{ padding: '6px 12px', background: tableSurface === s ? '#0284c7' : '#f8fafc', color: tableSurface === s ? '#fff' : '#333', border: '1px solid #ccc', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold' }}>
+              {s} ({SURFACE_CONFIG[s].unit}당)
+            </button>
+          ))}
+        </div>
+
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+          <thead>
+            <tr style={{ background: '#f0f9ff', borderTop: '2px solid #0284c7' }}>
+              <th style={{ padding: '8px', border: '1px solid #ddd' }}>표면재 종류</th>
+              <th style={{ padding: '8px', border: '1px solid #ddd' }}>두께 규격</th>
+              <th style={{ padding: '8px', border: '1px solid #ddd' }}>단가 단위</th>
+              <th style={{ padding: '8px', border: '1px solid #ddd' }}>단가 (원)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {SURFACE_CONFIG[tableSurface].thicknesses.map((th) => {
+              const sk = `SURFACE_${tableSurface}_${th}`;
+              const sc = costDb[sk] ?? 0;
+              return (
+                <tr key={th}>
+                  <td style={{ padding: '6px', border: '1px solid #ddd', textAlign: 'center', fontWeight: 'bold' }}>{tableSurface}</td>
+                  <td style={{ padding: '6px', border: '1px solid #ddd', textAlign: 'center', color: '#0369a1', fontWeight: 'bold' }}>{th}</td>
+                  <td style={{ padding: '6px', border: '1px solid #ddd', textAlign: 'center' }}>원 / {SURFACE_CONFIG[tableSurface].unit}</td>
+                  <td style={{ padding: '4px', border: '1px solid #ddd' }}>
+                    <input type="number" value={sc === 0 ? '' : sc} placeholder="0" onChange={(e) => handleCellChange(sk, Number(e.target.value))} style={{ width: '95%', textAlign: 'right', padding: '4px', borderRadius: '4px', border: '1px solid #ccc' }} />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* 3. 실시간 산출 결과 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+        <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+          <h3 style={{ fontSize: '15px', marginTop: 0, color: '#2563eb' }}>⚙️ 견적 조건 선택 (표 단가 자동 연동)</h3>
+          <div style={{ display: 'grid', gap: '8px', fontSize: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
+              <div>
+                <label style={{ fontWeight: 'bold' }}>보드</label>
+                <select value={boardType} onChange={(e) => setBoardType(e.target.value as any)} style={{ width: '100%', padding: '6px' }}>
+                  <option value="MDF">MDF</option>
+                  <option value="PB">PB</option>
+                  <option value="합판">합판</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontWeight: 'bold' }}>두께</label>
+                <select value={thickness} onChange={(e) => setThickness(e.target.value)} style={{ width: '100%', padding: '6px' }}>
+                  {BOARD_CONFIG[boardType].thicknesses.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontWeight: 'bold' }}>비중</label>
+                <select value={density} onChange={(e) => setDensity(e.target.value)} style={{ width: '100%', padding: '6px' }}>
+                  {BOARD_CONFIG[boardType].densities.map((d) => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
+              <div>
+                <label style={{ fontWeight: 'bold' }}>표면재</label>
+                <select value={selectedSurfaceType} onChange={(e) => setSelectedSurfaceType(e.target.value)} style={{ width: '100%', padding: '6px' }}>
+                  {Object.keys(SURFACE_CONFIG).map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontWeight: 'bold' }}>두께</label>
+                <select value={selectedSurfaceThick} onChange={(e) => setSelectedSurfaceThick(e.target.value)} style={{ width: '100%', padding: '6px' }}>
+                  {SURFACE_CONFIG[selectedSurfaceType].thicknesses.map((th) => <option key={th} value={th}>{th}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontWeight: 'bold' }}>가공</label>
+                <select value={processingType} onChange={(e) => setProcessingType(e.target.value as any)} style={{ width: '100%', padding: '6px' }}>
+                  <option value="양면">양면</option>
+                  <option value="단면">단면</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <div>
+                <label style={{ fontWeight: 'bold' }}>수량 (장)</label>
+                <input type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} style={{ width: '100%', padding: '6px' }} />
+              </div>
+              <div>
+                <label style={{ fontWeight: 'bold' }}>목표 마진율 (%)</label>
+                <input type="number" value={targetMargin} onChange={(e) => setTargetMargin(Number(e.target.value))} style={{ width: '100%', padding: '6px' }} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ background: '#f0fdf4', padding: '16px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+          <h3 style={{ fontSize: '15px', marginTop: 0, color: '#166534' }}>📊 실시간 연동 원가 산출 결과</h3>
+          <div style={{ marginBottom: '8px' }}>
+            <div style={{ fontSize: '12px', color: '#65a30d' }}>장당 제조원가</div>
+            <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#14532d' }}>{Math.round(baseCostPerItem).toLocaleString()} 원</div>
+          </div>
+          <div style={{ background: '#16a34a', color: '#fff', padding: '12px', borderRadius: '6px', marginBottom: '8px' }}>
+            <div style={{ fontSize: '12px', opacity: 0.9 }}>추천 판매 단가 (장당)</div>
+            <div style={{ fontSize: '22px', fontWeight: 'bold' }}>{recommendedUnitPrice.toLocaleString()} 원</div>
+          </div>
+          <div style={{ background: '#fff', padding: '10px', borderRadius: '6px', border: '1px solid #22c55e' }}>
+            <div style={{ fontSize: '12px', color: '#15803d' }}>예상 총 이익금 (마진율)</div>
+            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#166534' }}>+{totalProfit.toLocaleString()} 원 ({actualMarginRate}%)</div>
+          </div>
         </div>
       </div>
     </div>
@@ -919,7 +904,7 @@ function EstimateSection() {
 }
 
 // ==========================================
-// 6. 거래처 관리 탭 (비밀번호 설정 포함)
+// 6. 거래처 관리 탭
 // ==========================================
 function CompaniesSection() {
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -960,19 +945,7 @@ function CompaniesSection() {
       alert(`등록 실패: ${error.message}`);
     } else {
       alert('거래처 정보 및 비밀번호가 등록되었습니다.');
-      setForm({
-        company_name: '',
-        password: '1234',
-        biz_number: '',
-        address: '',
-        phone: '',
-        fax: '',
-        contact_person: '',
-        contact_phone: '',
-        position: '',
-        email: '',
-        memo: '',
-      });
+      setForm({ company_name: '', password: '1234', biz_number: '', address: '', phone: '', fax: '', contact_person: '', contact_phone: '', position: '', email: '', memo: '' });
       fetchCompanies();
     }
   };
@@ -986,7 +959,6 @@ function CompaniesSection() {
   return (
     <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
       <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: 0, marginBottom: '16px' }}>🏢 거래처 등록 및 비밀번호 관리 (관리자 전용)</h2>
-
       <form onSubmit={handleAddCompany} style={{ background: '#f8fafc', padding: '16px', borderRadius: '8px', marginBottom: '20px', border: '1px solid #cbd5e1' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px', marginBottom: '10px' }}>
           <div>
