@@ -92,7 +92,7 @@ const SURFACE_CONFIG: { [key: string]: { unit: '장' | 'm'; thicknesses: string[
   포일: { unit: 'm', thicknesses: ['기본'] },
 };
 
-// reDoor (엘데코) 전체 완제품 목록
+// reDoor 완제품 데이터
 const REDOOR_PRODUCTS = [
   { group: 'Special PET+LPM', code: 'RPMN-126', name: '매트 옐로우피치', spec: '18T', price: 49500, eco: 'E0' },
   { group: 'Special PET+LPM', code: 'RPMN-123', name: '매트 오렌지크림', spec: '18T', price: 49500, eco: 'E0' },
@@ -178,7 +178,7 @@ const REDOOR_PRODUCTS = [
 ];
 
 const INITIAL_PDF_COSTS: { [key: string]: number } = {
-  // 1. PB (국산 - 동화기업)
+  // PB (국산)
   'PB (국산)_12t_13형_E1': 12500,
   'PB (국산)_15t_주방용_E1': 12500,
   'PB (국산)_15t_13형_E1': 12500,
@@ -197,7 +197,7 @@ const INITIAL_PDF_COSTS: { [key: string]: number } = {
   'PB (국산)_30t_13형_E0': 31500,
   'PB (국산)_30t_15형_E0': 32500,
 
-  // 2. PB (수입 - 태국/중국)
+  // PB (수입)
   'PB (수입)_12t_중국산_E1': 8600,
   'PB (수입)_12t_중국산_E0': 9000,
   'PB (수입)_15t_태국산_E1': 9700,
@@ -209,7 +209,7 @@ const INITIAL_PDF_COSTS: { [key: string]: number } = {
   'PB (수입)_18t_중국산_E1': 11700,
   'PB (수입)_18t_중국산_E0': 12500,
 
-  // 3. MDF
+  // MDF
   'MDF_9t_INT_E1': 7000,
   'MDF_12t_INT_E1': 8800,
   'MDF_12t_INT_E0': 9200,
@@ -218,7 +218,6 @@ const INITIAL_PDF_COSTS: { [key: string]: number } = {
   'MDF_18t_INT_E1': 12000,
   'MDF_18t_INT_E0': 12700,
 
-  // 4. 표면재 기본 단가
   'SURFACE_PET_0.2t': 3500,
   'SURFACE_PVC_0.2t': 2800,
   'SURFACE_PP_0.2t': 3200,
@@ -713,33 +712,26 @@ function AdminSection() {
 }
 
 // ==========================================
-// 4. 원가 단가 관리 & 실시간 산출기 탭 (드롭다운 + 실시간 필터 검색 양방향 지원)
+// 4. 원가 단가 관리 & 실시간 산출기 탭 (판매가 직접입력/마진 산출 및 reDoor 완전지원)
 // ==========================================
 function CalculatorSection() {
   const [costDb, setCostDb] = useState<{ [key: string]: number }>(INITIAL_PDF_COSTS);
 
-  // 상단 단가표 메인 탭
   const [tableMainTab, setTableMainTab] = useState<'reDoor' | 'board' | 'surface'>('reDoor');
   const [tableBoard, setTableBoard] = useState<'MDF' | 'PB (국산)' | 'PB (수입)' | '합판'>('PB (국산)');
   const [tableDensity, setTableDensity] = useState<string>('주방용');
   const [tableSurface, setTableSurface] = useState<string>('PET');
 
-  // 상단 reDoor 단가표 필터용 상태
   const [tableRedoorGroup, setTableRedoorGroup] = useState<string>('전체');
   const [tableRedoorSearch, setTableRedoorSearch] = useState<string>('');
 
-  // 하단 견적 계산기 reDoor 선택 모드 ('select': 대분류 드롭다운 방식, 'search': 실시간 검색/필터링 방식)
-  const [calcMode, setCalcMode] = useState<'custom' | 'reDoor'>('reDoor');
+  const [calcMode, setCalcMode] = useState<'reDoor' | 'custom'>('reDoor');
   const [redoorSelectType, setRedoorSelectType] = useState<'dropdown' | 'filter'>('dropdown');
 
-  // 드롭다운 방식 선택 상태
   const [selectedGroup, setSelectedGroup] = useState<string>('Special PET+LPM');
   const [selectedRedoorCode, setSelectedRedoorCode] = useState<string>('RPMN-110');
-
-  // 실시간 필터 검색 방식 상태
   const [calcFilterKeyword, setCalcFilterKeyword] = useState<string>('');
 
-  // 일반 조합 산출 조건
   const [boardType, setBoardType] = useState<'MDF' | 'PB (국산)' | 'PB (수입)' | '합판'>('PB (국산)');
   const [thickness, setThickness] = useState('18t');
   const [density, setDensity] = useState('13형');
@@ -749,7 +741,11 @@ function CalculatorSection() {
   const [selectedSurfaceThick, setSelectedSurfaceThick] = useState('0.2t');
   const [processingType, setProcessingType] = useState<'양면' | '단면'>('양면');
   const [quantity, setQuantity] = useState<number>(100);
-  const [targetMargin, setTargetMargin] = useState<number>(15);
+
+  // 📌 판매가격 및 마진계산 방식 설정 ('salePrice': 판매가 직접 입력 방식, 'marginRate': 마진율 입력 방식)
+  const [priceInputMode, setPriceInputMode] = useState<'salePrice' | 'marginRate'>('salePrice');
+  const [customSalePrice, setCustomSalePrice] = useState<number>(55000);
+  const [targetMarginRate, setTargetMarginRate] = useState<number>(15);
 
   useEffect(() => {
     fetchCostSettings();
@@ -767,13 +763,22 @@ function CalculatorSection() {
     }
   }, [selectedSurfaceType]);
 
-  // 대분류 드롭다운 변경 시 소분류 품목 자동 갱신
   useEffect(() => {
     const groupProds = REDOOR_PRODUCTS.filter((p) => p.group === selectedGroup);
     if (groupProds.length > 0) {
       setSelectedRedoorCode(groupProds[0].code);
     }
   }, [selectedGroup]);
+
+  // reDoor 품목 선택 시 입력창 기본 판매가를 공급가 기준으로 세팅
+  useEffect(() => {
+    if (calcMode === 'reDoor') {
+      const targetProd = REDOOR_PRODUCTS.find((p) => p.code === selectedRedoorCode);
+      if (targetProd) {
+        setCustomSalePrice(Math.ceil(targetProd.price * 1.15)); // 기본 15% 마진 적용한 판매가 초기화
+      }
+    }
+  }, [selectedRedoorCode, calcMode]);
 
   const fetchCostSettings = async () => {
     const { data } = await supabase.from('cost_settings').select('*');
@@ -794,22 +799,19 @@ function CalculatorSection() {
     alert('원가 단가 설정이 DB에 성공적으로 저장되었습니다!');
   };
 
-  // 대분류 카테고리 고유값 추출
   const reDoorGroups = Array.from(new Set(REDOOR_PRODUCTS.map((p) => p.group)));
 
-  // 상단 단가표 테이블 필터링 데이터
   const filteredTableRedoor = REDOOR_PRODUCTS.filter((p) => {
     const matchGroup = tableRedoorGroup === '전체' || p.group === tableRedoorGroup;
     const matchSearch = p.code.toLowerCase().includes(tableRedoorSearch.toLowerCase()) || p.name.includes(tableRedoorSearch);
     return matchGroup && matchSearch;
   });
 
-  // 하단 계산기 검색 방식 필터링 데이터
   const filteredCalcRedoor = REDOOR_PRODUCTS.filter((p) => {
     return p.code.toLowerCase().includes(calcFilterKeyword.toLowerCase()) || p.name.includes(calcFilterKeyword);
   });
 
-  // 실시간 단가 산출 계산 로직
+  // 📌 장당 원가 단가 계산
   let baseCostPerItem = 0;
   let currentProductTitle = '';
 
@@ -840,10 +842,19 @@ function CalculatorSection() {
     currentProductTitle = `${boardType} ${thickness} + ${selectedSurfaceType} (${processingType})`;
   }
 
-  const recommendedUnitPrice = calcMode === 'reDoor' ? baseCostPerItem : Math.ceil((baseCostPerItem / (1 - targetMargin / 100)) / 100) * 100;
-  const totalPrice = recommendedUnitPrice * quantity;
-  const totalProfit = calcMode === 'reDoor' ? 0 : totalPrice - baseCostPerItem * quantity;
-  const actualMarginRate = calcMode === 'reDoor' ? '0.0' : totalPrice > 0 ? ((totalProfit / totalPrice) * 100).toFixed(1) : '0';
+  // 📌 최종 장당 판매가, 마진액, 마진율 동적 연동 계산
+  let finalUnitPrice = 0;
+  if (priceInputMode === 'salePrice') {
+    finalUnitPrice = customSalePrice;
+  } else {
+    finalUnitPrice = Math.ceil((baseCostPerItem / (1 - targetMarginRate / 100)) / 100) * 100;
+  }
+
+  const marginPerItem = finalUnitPrice - baseCostPerItem;
+  const actualMarginRate = finalUnitPrice > 0 ? ((marginPerItem / finalUnitPrice) * 100).toFixed(1) : '0.0';
+
+  const totalPrice = finalUnitPrice * quantity;
+  const totalProfit = marginPerItem * quantity;
 
   return (
     <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
@@ -868,13 +879,11 @@ function CalculatorSection() {
           </button>
         </div>
 
-        {/* 1. reDoor 완제품 단가표 (드롭다운 + 검색 필터 적용) */}
+        {/* 1. reDoor 완제품 단가표 */}
         {tableMainTab === 'reDoor' && (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '10px' }}>
               <h4 style={{ margin: 0, color: '#6d28d9' }}>✨ reDoor 완제품 공급 단가표 ({filteredTableRedoor.length}개 표시)</h4>
-
-              {/* 검색 및 필터 영역 */}
               <div style={{ display: 'flex', gap: '8px' }}>
                 <select value={tableRedoorGroup} onChange={(e) => setTableRedoorGroup(e.target.value)} style={{ padding: '6px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '12px' }}>
                   <option value="전체">전체 카테고리</option>
@@ -898,7 +907,7 @@ function CalculatorSection() {
                     <th style={{ padding: '8px', border: '1px solid #ddd' }}>제품코드</th>
                     <th style={{ padding: '8px', border: '1px solid #ddd' }}>제품명/패턴</th>
                     <th style={{ padding: '8px', border: '1px solid #ddd' }}>규격</th>
-                    <th style={{ padding: '8px', border: '1px solid #ddd' }}>완성품 단가 (원)</th>
+                    <th style={{ padding: '8px', border: '1px solid #ddd' }}>완성품 공급단가 (원)</th>
                     <th style={{ padding: '8px', border: '1px solid #ddd' }}>등급</th>
                   </tr>
                 </thead>
@@ -1011,8 +1020,8 @@ function CalculatorSection() {
         )}
       </div>
 
-      {/* 하단 견적 조건 선택 및 실시간 산출 결과 연동 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+      {/* 하단 견적 조건 선택 및 판매가/마진 실시간 산출기 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
         <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <h3 style={{ fontSize: '15px', margin: 0, color: '#2563eb' }}>⚙️ 견적 조건 선택</h3>
@@ -1026,86 +1035,52 @@ function CalculatorSection() {
             </div>
           </div>
 
-          {calcMode === 'reDoor' ? (
-            <div style={{ display: 'grid', gap: '12px', fontSize: '12px' }}>
-              {/* 드롭다운 vs 실시간 필터 전환 스위치 */}
-              <div style={{ display: 'flex', gap: '6px', background: '#f1f5f9', padding: '4px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                <button
-                  type="button"
-                  onClick={() => setRedoorSelectType('dropdown')}
-                  style={{ flex: 1, padding: '6px', border: 'none', borderRadius: '4px', background: redoorSelectType === 'dropdown' ? '#fff' : 'transparent', fontWeight: 'bold', cursor: 'pointer', color: redoorSelectType === 'dropdown' ? '#7c3aed' : '#64748b', boxShadow: redoorSelectType === 'dropdown' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
-                >
-                  ▼ 대분류 드롭다운 방식
+          {/* reDoor 선택 모드 */}
+          {calcMode === 'reDoor' && (
+            <div style={{ display: 'grid', gap: '10px', fontSize: '12px', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', gap: '6px', background: '#f1f5f9', padding: '4px', borderRadius: '6px' }}>
+                <button type="button" onClick={() => setRedoorSelectType('dropdown')} style={{ flex: 1, padding: '4px', border: 'none', borderRadius: '4px', background: redoorSelectType === 'dropdown' ? '#fff' : 'transparent', fontWeight: 'bold', cursor: 'pointer', color: redoorSelectType === 'dropdown' ? '#7c3aed' : '#64748b' }}>
+                  ▼ 드롭다운
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setRedoorSelectType('filter')}
-                  style={{ flex: 1, padding: '6px', border: 'none', borderRadius: '4px', background: redoorSelectType === 'filter' ? '#fff' : 'transparent', fontWeight: 'bold', cursor: 'pointer', color: redoorSelectType === 'filter' ? '#7c3aed' : '#64748b', boxShadow: redoorSelectType === 'filter' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
-                >
-                  🔍 실시간 검색/필터 방식
+                <button type="button" onClick={() => setRedoorSelectType('filter')} style={{ flex: 1, padding: '4px', border: 'none', borderRadius: '4px', background: redoorSelectType === 'filter' ? '#fff' : 'transparent', fontWeight: 'bold', cursor: 'pointer', color: redoorSelectType === 'filter' ? '#7c3aed' : '#64748b' }}>
+                  🔍 실시간 검색
                 </button>
               </div>
 
-              {/* 1. 드롭다운 선택 방식 */}
-              {redoorSelectType === 'dropdown' && (
-                <div style={{ display: 'grid', gap: '8px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '4px', color: '#475569' }}>1차: 제품 그룹 선택 (대분류)</label>
-                    <select value={selectedGroup} onChange={(e) => setSelectedGroup(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1', fontWeight: 'bold' }}>
-                      {reDoorGroups.map((g) => <option key={g} value={g}>{g}</option>)}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '4px', color: '#475569' }}>2차: 세부 제품 선택 (소분류)</label>
-                    <select value={selectedRedoorCode} onChange={(e) => setSelectedRedoorCode(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #7c3aed', fontWeight: 'bold', color: '#6d28d9' }}>
-                      {REDOOR_PRODUCTS.filter((p) => p.group === selectedGroup).map((prod) => (
-                        <option key={prod.code + prod.name} value={prod.code}>
-                          {prod.code} - {prod.name} ({prod.price.toLocaleString()}원)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+              {redoorSelectType === 'dropdown' ? (
+                <div style={{ display: 'grid', gap: '6px' }}>
+                  <select value={selectedGroup} onChange={(e) => setSelectedGroup(e.target.value)} style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid #ccc' }}>
+                    {reDoorGroups.map((g) => <option key={g} value={g}>{g}</option>)}
+                  </select>
+                  <select value={selectedRedoorCode} onChange={(e) => setSelectedRedoorCode(e.target.value)} style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid #7c3aed', fontWeight: 'bold', color: '#6d28d9' }}>
+                    {REDOOR_PRODUCTS.filter((p) => p.group === selectedGroup).map((prod) => (
+                      <option key={prod.code + prod.name} value={prod.code}>
+                        {prod.code} - {prod.name} (원가 {prod.price.toLocaleString()}원)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gap: '6px' }}>
+                  <input type="text" placeholder="검색어 입력 (코드/이름)..." value={calcFilterKeyword} onChange={(e) => setCalcFilterKeyword(e.target.value)} style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid #ccc' }} />
+                  <select value={selectedRedoorCode} onChange={(e) => setSelectedRedoorCode(e.target.value)} style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid #7c3aed', fontWeight: 'bold', color: '#6d28d9' }}>
+                    {filteredCalcRedoor.map((prod) => (
+                      <option key={prod.code + prod.name} value={prod.code}>
+                        [{prod.group}] {prod.code} - {prod.name} (원가 {prod.price.toLocaleString()}원)
+                      </option>
+                    ))}
+                  </select>
                 </div>
               )}
-
-              {/* 2. 실시간 키워드 필터 검색 방식 */}
-              {redoorSelectType === 'filter' && (
-                <div style={{ display: 'grid', gap: '8px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '4px', color: '#475569' }}>제품 검색 필터 (코드 또는 제품명)</label>
-                    <input
-                      type="text"
-                      placeholder="예: 110, 화이트, 710, PP..."
-                      value={calcFilterKeyword}
-                      onChange={(e) => setCalcFilterKeyword(e.target.value)}
-                      style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', fontWeight: 'bold' }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '4px', color: '#475569' }}>검색 결과 선택 ({filteredCalcRedoor.length}건)</label>
-                    <select value={selectedRedoorCode} onChange={(e) => setSelectedRedoorCode(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #7c3aed', fontWeight: 'bold', color: '#6d28d9' }}>
-                      {filteredCalcRedoor.map((prod) => (
-                        <option key={prod.code + prod.name} value={prod.code}>
-                          [{prod.group}] {prod.code} - {prod.name} ({prod.price.toLocaleString()}원)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '4px' }}>수량 (장)</label>
-                <input type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid #ccc' }} />
-              </div>
             </div>
-          ) : (
-            <div style={{ display: 'grid', gap: '8px', fontSize: '12px' }}>
+          )}
+
+          {/* 일반 가공 조합 모드 */}
+          {calcMode === 'custom' && (
+            <div style={{ display: 'grid', gap: '8px', fontSize: '12px', marginBottom: '12px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
                 <div>
-                  <label style={{ fontWeight: 'bold' }}>보드 종류</label>
+                  <label style={{ fontWeight: 'bold' }}>보드</label>
                   <select value={boardType} onChange={(e) => setBoardType(e.target.value as any)} style={{ width: '100%', padding: '6px' }}>
                     <option value="PB (국산)">PB (국산)</option>
                     <option value="PB (수입)">PB (수입)</option>
@@ -1148,37 +1123,78 @@ function CalculatorSection() {
                   </select>
                 </div>
               </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                <div>
-                  <label style={{ fontWeight: 'bold' }}>수량 (장)</label>
-                  <input type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} style={{ width: '100%', padding: '6px' }} />
-                </div>
-                <div>
-                  <label style={{ fontWeight: 'bold' }}>목표 마진율 (%)</label>
-                  <input type="number" value={targetMargin} onChange={(e) => setTargetMargin(Number(e.target.value))} style={{ width: '100%', padding: '6px' }} />
-                </div>
-              </div>
             </div>
           )}
+
+          {/* 📌 판매가 직접 입력 및 마진 계산 설정 영역 (공통) */}
+          <div style={{ background: '#fff', padding: '12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span style={{ fontWeight: 'bold', color: '#1e293b' }}>🏷️ 판매가격 및 마진 설정</span>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <button onClick={() => setPriceInputMode('salePrice')} style={{ padding: '2px 6px', border: 'none', borderRadius: '3px', background: priceInputMode === 'salePrice' ? '#059669' : '#e2e8f0', color: priceInputMode === 'salePrice' ? '#fff' : '#333', fontSize: '10px', cursor: 'pointer', fontWeight: 'bold' }}>
+                  판매가 직접입력
+                </button>
+                <button onClick={() => setPriceInputMode('marginRate')} style={{ padding: '2px 6px', border: 'none', borderRadius: '3px', background: priceInputMode === 'marginRate' ? '#0284c7' : '#e2e8f0', color: priceInputMode === 'marginRate' ? '#fff' : '#333', fontSize: '10px', cursor: 'pointer', fontWeight: 'bold' }}>
+                  마진율 입력
+                </button>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              {priceInputMode === 'salePrice' ? (
+                <div>
+                  <label style={{ display: 'block', fontWeight: 'bold', color: '#059669', marginBottom: '2px' }}>희망 판매가 (원/장) *</label>
+                  <input type="number" value={customSalePrice} onChange={(e) => setCustomSalePrice(Number(e.target.value))} style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid #059669', fontWeight: 'bold' }} />
+                </div>
+              ) : (
+                <div>
+                  <label style={{ display: 'block', fontWeight: 'bold', color: '#0284c7', marginBottom: '2px' }}>목표 마진율 (%) *</label>
+                  <input type="number" value={targetMarginRate} onChange={(e) => setTargetMarginRate(Number(e.target.value))} style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid #0284c7', fontWeight: 'bold' }} />
+                </div>
+              )}
+
+              <div>
+                <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '2px' }}>발주 수량 (장)</label>
+                <input type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid #ccc' }} />
+              </div>
+            </div>
+          </div>
         </div>
 
+        {/* 📌 실시간 마진 및 최종 산출 금액 표시 창 */}
         <div style={{ background: '#f0fdf4', padding: '16px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
-          <h3 style={{ fontSize: '15px', marginTop: 0, color: '#166534' }}>📊 실시간 연동 원가 산출 결과</h3>
+          <h3 style={{ fontSize: '15px', marginTop: 0, color: '#166534' }}>📊 실시간 판매가 & 마진 산출 결과</h3>
           <div style={{ fontSize: '12px', color: '#475569', marginBottom: '8px', fontWeight: 'bold' }}>
             {currentProductTitle}
           </div>
-          <div style={{ marginBottom: '8px' }}>
-            <div style={{ fontSize: '12px', color: '#65a30d' }}>장당 원가 단가</div>
-            <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#14532d' }}>{Math.round(baseCostPerItem).toLocaleString()} 원</div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+            <div style={{ background: '#fff', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
+              <div style={{ fontSize: '11px', color: '#65a30d' }}>장당 제조/원가 단가</div>
+              <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#14532d' }}>{Math.round(baseCostPerItem).toLocaleString()} 원</div>
+            </div>
+
+            <div style={{ background: '#16a34a', color: '#fff', padding: '8px', borderRadius: '6px' }}>
+              <div style={{ fontSize: '11px', opacity: 0.9 }}>장당 최종 판매가격</div>
+              <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{finalUnitPrice.toLocaleString()} 원</div>
+            </div>
           </div>
-          <div style={{ background: '#16a34a', color: '#fff', padding: '12px', borderRadius: '6px', marginBottom: '8px' }}>
-            <div style={{ fontSize: '12px', opacity: 0.9 }}>최종 공급 단가 (장당)</div>
-            <div style={{ fontSize: '22px', fontWeight: 'bold' }}>{recommendedUnitPrice.toLocaleString()} 원</div>
+
+          <div style={{ background: '#fff', padding: '10px', borderRadius: '6px', border: '1px solid #22c55e', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '2px' }}>
+              <span style={{ color: '#15803d', fontWeight: 'bold' }}>장당 마진액</span>
+              <span style={{ color: '#166534', fontWeight: 'bold' }}>+{marginPerItem.toLocaleString()} 원</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+              <span style={{ color: '#15803d', fontWeight: 'bold' }}>최종 마진율</span>
+              <span style={{ color: '#166534', fontWeight: 'bold' }}>{actualMarginRate}%</span>
+            </div>
           </div>
-          <div style={{ background: '#fff', padding: '10px', borderRadius: '6px', border: '1px solid #22c55e' }}>
-            <div style={{ fontSize: '12px', color: '#15803d' }}>총 발주 공급 금액 ({quantity}장 기준)</div>
-            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#166534' }}>{totalPrice.toLocaleString()} 원</div>
+
+          <div style={{ background: '#ecfdf5', padding: '10px', borderRadius: '6px', border: '1px dashed #059669' }}>
+            <div style={{ fontSize: '11px', color: '#047857' }}>총 매출액 ({quantity}장 기준)</div>
+            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#065f46' }}>{totalPrice.toLocaleString()} 원</div>
+            <div style={{ fontSize: '11px', color: '#059669', marginTop: '2px' }}>총 순이익금: +{totalProfit.toLocaleString()} 원</div>
           </div>
         </div>
       </div>
