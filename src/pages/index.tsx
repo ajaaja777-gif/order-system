@@ -97,30 +97,94 @@ const SURFACE_CONFIG: { [key: string]: { unit: '장' | 'm'; thicknesses: string[
   포일: { unit: 'm', thicknesses: ['기본'] },
 };
 
-// reDoor (PET+LPM, PET+PP 제품) 전용 단가표 데이터
+// 📌 PDF 견적서 내 reDoor (엘데코) 전체 제품 목록 (100% 누락 없이 반영)
 const REDOOR_PRODUCTS = [
+  // Special PET+LPM (Logo)
   { group: 'Special PET+LPM', code: 'RPMN-126', name: '매트 옐로우피치', spec: '18T', price: 49500, eco: 'E0' },
   { group: 'Special PET+LPM', code: 'RPMN-123', name: '매트 오렌지크림', spec: '18T', price: 49500, eco: 'E0' },
   { group: 'Special PET+LPM', code: 'RPMN-122', name: '매트 모카커피', spec: '18T', price: 49500, eco: 'E0' },
   { group: 'Special PET+LPM', code: 'RPMN-121', name: '매트 애쉬브라운', spec: '18T', price: 49500, eco: 'E0' },
+  { group: 'Special PET+LPM', code: 'RPMN-129', name: '매트 멜로우피치', spec: '18T', price: 49500, eco: 'E0' },
+  { group: 'Special PET+LPM', code: 'RPMN-130', name: '매트 스카렛핑크', spec: '18T', price: 49500, eco: 'E0' },
+  { group: 'Special PET+LPM', code: 'RPMN-131', name: '매트 라일락', spec: '18T', price: 49500, eco: 'E0' },
+  { group: 'Special PET+LPM', code: 'RPMN-132', name: '매트 라벤더', spec: '18T', price: 49500, eco: 'E0' },
   { group: 'Special PET+LPM', code: 'RPMN-110', name: '매트 스노우화이트', spec: '18T', price: 48500, eco: 'E0' },
   { group: 'Special PET+LPM', code: 'RPMN-111', name: '매트 크림화이트', spec: '18T', price: 48500, eco: 'E0' },
-  { group: 'Special PET+LPM', code: 'RPHG-710', name: '글로시 화이트', spec: '18T', price: 42500, eco: 'E0' },
+  { group: 'Special PET+LPM', code: 'RPMN-114', name: '매트 쉘아이보리', spec: '18T', price: 49500, eco: 'E0' },
+  { group: 'Special PET+LPM', code: 'RPMN-137', name: '매트 베이지화이트', spec: '18T', price: 49500, eco: 'E0' },
+  { group: 'Special PET+LPM', code: 'RPMN-138', name: '매트 밀그레이', spec: '18T', price: 49500, eco: 'E0' },
+  { group: 'Special PET+LPM', code: 'RPMN-139', name: '매트 실버리그레이', spec: '18T', price: 49500, eco: 'E0' },
+  { group: 'Special PET+LPM', code: 'RPMN-140', name: '매트 베이지그레이', spec: '18T', price: 49500, eco: 'E0' },
+  { group: 'Special PET+LPM', code: 'RPMN-142', name: '매트 웜그레이', spec: '18T', price: 49500, eco: 'E0' },
+  { group: 'Special PET+LPM', code: 'RPMN-143', name: '매트 피틸러스그레이', spec: '18T', price: 49500, eco: 'E0' },
+  { group: 'Special PET+LPM', code: 'RPMN-145', name: '매트 센트럴그레이', spec: '18T', price: 49500, eco: 'E0' },
+  { group: 'Special PET+LPM', code: 'RPMN-146', name: '매트 픽그레이', spec: '18T', price: 49500, eco: 'E0' },
+  { group: 'Special PET+LPM', code: 'RPMN-148', name: '매트 코코아그레이', spec: '18T', price: 49500, eco: 'E0' },
+  { group: 'Special PET+LPM', code: 'RPMN-134', name: '매트 스카이', spec: '18T', price: 49500, eco: 'E0' },
+  { group: 'Special PET+LPM', code: 'RPMN-135', name: '매트 아쿠아블루', spec: '18T', price: 49500, eco: 'E0' },
+  { group: 'Special PET+LPM', code: 'RPMN-136', name: '매트 산타모니카블루', spec: '18T', price: 49500, eco: 'E0' },
+  { group: 'Special PET+LPM', code: 'RPMN-150', name: '매트 돌핀그레이', spec: '18T', price: 49500, eco: 'E0' },
+  { group: 'Special PET+LPM', code: 'RPMN-151', name: '매트 블루차콜', spec: '18T', price: 49500, eco: 'E0' },
   { group: 'Special PET+LPM', code: 'RPHP-710', name: '글로시 화이트펄', spec: '18T', price: 43500, eco: 'E0' },
+  { group: 'Special PET+LPM', code: 'RPHG-710', name: '글로시 화이트', spec: '18T', price: 42500, eco: 'E0' },
+  { group: 'Special PET+LPM', code: 'RPHG-712', name: '글로시 아이보리', spec: '18T', price: 42500, eco: 'E0' },
+  { group: 'Special PET+LPM', code: 'RPHG-714', name: '글로시 샌드그레이', spec: '18T', price: 42500, eco: 'E0' },
+  { group: 'Special PET+LPM', code: 'RPHG-716', name: '글로시 애쉬그레이', spec: '18T', price: 42500, eco: 'E0' },
+  { group: 'Special PET+LPM', code: 'RPHG-713', name: '글로시 캐시미어', spec: '18T', price: 42500, eco: 'E0' },
+  { group: 'Special PET+LPM', code: 'RPHG-715', name: '글로시 라이트그레이', spec: '18T', price: 42500, eco: 'E0' },
+  { group: 'Special PET+LPM', code: 'RPHG-717', name: '글로시 다크그레이', spec: '18T', price: 42500, eco: 'E0' },
+  { group: 'Special PET+LPM', code: 'RPHG-719', name: '글로시 클린화이트', spec: '18T', price: 42500, eco: 'E0' },
+  { group: 'Special PET+LPM', code: 'RPHG-731', name: '글로시 포그그레이', spec: '18T', price: 42500, eco: 'E0' },
+
+  // Premium PET+LPM (Logo)
+  { group: 'Premium PET+LPM', code: 'RPMN-721', name: '매트 미스트그린', spec: '18T', price: 41000, eco: 'E0' },
+  { group: 'Premium PET+LPM', code: 'RPMN-726', name: '매트 아쿠아마린', spec: '18T', price: 41000, eco: 'E0' },
   { group: 'Premium PET+LPM', code: 'RPMN-710', name: '매트 화이트', spec: '18T', price: 41000, eco: 'E0' },
   { group: 'Premium PET+LPM', code: 'RPMN-711', name: '매트 밀키화이트', spec: '18T', price: 41000, eco: 'E0' },
+  { group: 'Premium PET+LPM', code: 'RPMN-712', name: '매트 아이보리', spec: '18T', price: 41000, eco: 'E0' },
+  { group: 'Premium PET+LPM', code: 'RPMN-719', name: '매트 클린 화이트', spec: '18T', price: 41000, eco: 'E0' },
   { group: 'Premium PET+LPM', code: 'RPMN-713', name: '매트 캐시미어', spec: '18T', price: 41000, eco: 'E0' },
+  { group: 'Premium PET+LPM', code: 'RPMN-723', name: '매트 코튼블루', spec: '18T', price: 41000, eco: 'E0' },
+  { group: 'Premium PET+LPM', code: 'RPMN-714', name: '매트 샌드 그레이', spec: '18T', price: 41000, eco: 'E0' },
+  { group: 'Premium PET+LPM', code: 'RPMN-716', name: '매트 애쉬 그레이', spec: '18T', price: 41000, eco: 'E0' },
+  { group: 'Premium PET+LPM', code: 'RPMN-715', name: '매트 라이트그레이', spec: '18T', price: 41000, eco: 'E0' },
+  { group: 'Premium PET+LPM', code: 'RPMN-731', name: '매트 포그그레이', spec: '18T', price: 41000, eco: 'E0' },
+  { group: 'Premium PET+LPM', code: 'RPMN-717', name: '매트 다크그레이', spec: '18T', price: 41000, eco: 'E0' },
+
+  // Premium PET+PP (Logo)
   { group: 'Premium PET+PP', code: 'RPMN-831', name: '스트라이프 포그그레이', spec: '18T', price: 54500, eco: 'E0' },
+  { group: 'Premium PET+PP', code: 'RPMN-819', name: '스트라이프 클린화이트', spec: '18T', price: 54500, eco: 'E0' },
   { group: 'Premium PET+PP', code: 'RPMN-519', name: '클린화이트 스톤', spec: '18T', price: 54500, eco: 'E0' },
+  { group: 'Premium PET+PP', code: 'RPMN-531', name: '포그그레이 스톤', spec: '18T', price: 54500, eco: 'E0' },
+  { group: 'Premium PET+PP', code: 'RPMN-517', name: '다크그레이 스톤', spec: '18T', price: 54500, eco: 'E0' },
   { group: 'Premium PET+PP', code: 'RPMN-710(P)', name: '매트 화이트', spec: '18T', price: 39500, eco: 'E0' },
+  { group: 'Premium PET+PP', code: 'RPMN-711(P)', name: '매트 밀키화이트', spec: '18T', price: 39500, eco: 'E0' },
+  { group: 'Premium PET+PP', code: 'RPMN-719(P)', name: '매트 클린 화이트', spec: '18T', price: 39500, eco: 'E0' },
+
+  // PP (Logo / Pattern)
+  { group: 'PP', code: 'RPPM-509', name: '우드 앤 스톤', spec: '18T', price: 67500, eco: 'E0' },
   { group: 'PP', code: 'RPPM-514', name: '브론즈오크', spec: '18T', price: 67500, eco: 'E0' },
+  { group: 'PP', code: 'RPPM-510', name: '컴포트 오크 캐러멜', spec: '18T', price: 67500, eco: 'E0' },
+  { group: 'PP', code: 'RPPM-511', name: '레드월넛', spec: '18T', price: 67500, eco: 'E0' },
+  { group: 'PP', code: 'RPPM-512', name: '라이트월넛', spec: '18T', price: 67500, eco: 'E0' },
+  { group: 'PP', code: 'RPPM-513', name: '코냑오크', spec: '18T', price: 67500, eco: 'E0' },
+  { group: 'PP', code: 'RPPM-529', name: '월넛 앤 오크', spec: '18T', price: 67500, eco: 'E0' },
   { group: 'PP', code: 'RPPM-530', name: '쉘화이트우드', spec: '18T', price: 53500, eco: 'E0' },
+  { group: 'PP', code: 'RPPM-531', name: '베이라이트오크', spec: '18T', price: 53500, eco: 'E0' },
+  { group: 'PP', code: 'RPPM-532', name: '베이네추럴오크', spec: '18T', price: 53500, eco: 'E0' },
+  { group: 'PP', code: 'RPPM-535', name: '시에라그레이오크', spec: '18T', price: 53500, eco: 'E0' },
+  { group: 'PP', code: 'RPPM-536', name: '루나 프로스트', spec: '18T', price: 53500, eco: 'E0' },
+  { group: 'PP', code: 'RPPM-537', name: '루나 그레이', spec: '18T', price: 53500, eco: 'E0' },
+  { group: 'PP', code: 'RPPM-538', name: '루나 베이지', spec: '18T', price: 53500, eco: 'E0' },
+  { group: 'PP', code: 'RPPM-539', name: '루나 오팔', spec: '18T', price: 53500, eco: 'E0' },
   { group: 'PP', code: 'RPPM-515', name: '사피아노 화이트', spec: '18T', price: 50500, eco: 'E0' },
+  { group: 'PP', code: 'RPPM-516', name: '사피아노 다크그레이', spec: '18T', price: 50500, eco: 'E0' },
+  { group: 'PP', code: 'RPPM-521', name: '메탈 헤어라인 실버', spec: '18T', price: 53500, eco: 'E0' },
+  { group: 'PP', code: 'RPPM-522', name: '헤어라인 브론즈', spec: '18T', price: 53500, eco: 'E0' },
 ];
 
-// MDF / PB 원판 단가 분리 초기 세팅
 const INITIAL_PDF_COSTS: { [key: string]: number } = {
-  // PB 단가 (동화기업 PB 표 원본)
+  // PB 단가 (동화기업 PB)
   'PB_12t_13형_E1': 12500,
   'PB_15t_주방용_E1': 12500,
   'PB_15t_13형_E1': 12500,
@@ -139,7 +203,7 @@ const INITIAL_PDF_COSTS: { [key: string]: number } = {
   'PB_30t_13형_E0': 31500,
   'PB_30t_15형_E0': 32500,
 
-  // MDF 단가 (태국/중국 원보드/케이원 MDF 표 원본)
+  // MDF 단가 (태국/중국 원보드/케이원)
   'MDF_9t_INT_E1': 7000,
   'MDF_12t_INT_E1': 8600,
   'MDF_12t_INT_E0': 9000,
@@ -154,7 +218,7 @@ const INITIAL_PDF_COSTS: { [key: string]: number } = {
   'MDF_30t_INT_E1': 21000,
   'MDF_30t_INT_E0': 22000,
 
-  // 표면재 m당 기본 단가
+  // 표면재 단가
   'SURFACE_PET_0.2t': 3500,
   'SURFACE_PVC_0.2t': 2800,
   'SURFACE_PP_0.2t': 3200,
@@ -648,18 +712,16 @@ function AdminSection() {
 }
 
 // ==========================================
-// 4. 원가 단가 관리 & 실시간 산출기 탭 (reDoor 전용 단가표 분리)
+// 4. 원가 단가 관리 & 실시간 산출기 탭 (reDoor 전체 전용 단가표 연동)
 // ==========================================
 function CalculatorSection() {
   const [costDb, setCostDb] = useState<{ [key: string]: number }>(INITIAL_PDF_COSTS);
   
-  // 단가표 서부 탭 선택 ('board' | 'surface' | 'reDoor')
-  const [tableMainTab, setTableMainTab] = useState<'board' | 'surface' | 'reDoor'>('board');
+  const [tableMainTab, setTableMainTab] = useState<'board' | 'surface' | 'reDoor'>('reDoor');
   const [tableBoard, setTableBoard] = useState<'MDF' | 'PB' | '합판'>('MDF');
   const [tableDensity, setTableDensity] = useState<string>('INT');
   const [tableSurface, setTableSurface] = useState<string>('PET');
 
-  // 실시간 산출 조건
   const [boardType, setBoardType] = useState<'MDF' | 'PB' | '합판'>('MDF');
   const [thickness, setThickness] = useState('18t');
   const [density, setDensity] = useState('INT');
@@ -735,21 +797,53 @@ function CalculatorSection() {
         </button>
       </div>
 
-      {/* 단가 관리 영역 구분 메인 탭 */}
       <div style={{ border: '1px solid #cbd5e1', padding: '16px', borderRadius: '8px', marginBottom: '24px', background: '#fff' }}>
         <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '2px solid #e2e8f0', paddingBottom: '10px' }}>
+          <button onClick={() => setTableMainTab('reDoor')} style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', background: tableMainTab === 'reDoor' ? '#7c3aed' : '#f1f5f9', color: tableMainTab === 'reDoor' ? '#fff' : '#334155', fontWeight: 'bold', cursor: 'pointer' }}>
+            1. reDoor 완제품 단가표 (PET / PP 전 품목 {REDOOR_PRODUCTS.length}개)
+          </button>
           <button onClick={() => setTableMainTab('board')} style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', background: tableMainTab === 'board' ? '#1e40af' : '#f1f5f9', color: tableMainTab === 'board' ? '#fff' : '#334155', fontWeight: 'bold', cursor: 'pointer' }}>
-            1. 보드 원판 단가표 (MDF / PB)
+            2. 보드 원판 단가표 (MDF / PB)
           </button>
           <button onClick={() => setTableMainTab('surface')} style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', background: tableMainTab === 'surface' ? '#0284c7' : '#f1f5f9', color: tableMainTab === 'surface' ? '#fff' : '#334155', fontWeight: 'bold', cursor: 'pointer' }}>
-            2. 표면재 단가표 (m당 자재)
-          </button>
-          <button onClick={() => setTableMainTab('reDoor')} style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', background: tableMainTab === 'reDoor' ? '#7c3aed' : '#f1f5f9', color: tableMainTab === 'reDoor' ? '#fff' : '#334155', fontWeight: 'bold', cursor: 'pointer' }}>
-            3. reDoor 완제품 단가표 (PET+LPM / PP)
+            3. 표면재 단가표 (m당 자재)
           </button>
         </div>
 
-        {/* 1. 보드 원판 단가표 */}
+        {/* 1. reDoor 전체 완제품 단가표 */}
+        {tableMainTab === 'reDoor' && (
+          <div>
+            <h4 style={{ margin: '0 0 10px 0', color: '#6d28d9' }}>✨ reDoor (Special/Premium PET+LPM, PP) 완제품 전체 공급 단가표 ({REDOOR_PRODUCTS.length}개)</h4>
+            <div style={{ overflowX: 'auto', maxHeight: '500px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                <thead style={{ position: 'sticky', top: 0, background: '#f5f3ff', zIndex: 1 }}>
+                  <tr style={{ borderTop: '2px solid #7c3aed' }}>
+                    <th style={{ padding: '8px', border: '1px solid #ddd' }}>구분</th>
+                    <th style={{ padding: '8px', border: '1px solid #ddd' }}>제품코드</th>
+                    <th style={{ padding: '8px', border: '1px solid #ddd' }}>제품명/패턴</th>
+                    <th style={{ padding: '8px', border: '1px solid #ddd' }}>규격</th>
+                    <th style={{ padding: '8px', border: '1px solid #ddd' }}>완성품 단가 (원)</th>
+                    <th style={{ padding: '8px', border: '1px solid #ddd' }}>등급</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {REDOOR_PRODUCTS.map((prod) => (
+                    <tr key={prod.code + prod.name}>
+                      <td style={{ padding: '6px', border: '1px solid #ddd', textAlign: 'center', fontWeight: 'bold', color: '#6d28d9' }}>{prod.group}</td>
+                      <td style={{ padding: '6px', border: '1px solid #ddd', textAlign: 'center', fontWeight: 'bold' }}>{prod.code}</td>
+                      <td style={{ padding: '6px', border: '1px solid #ddd' }}>{prod.name}</td>
+                      <td style={{ padding: '6px', border: '1px solid #ddd', textAlign: 'center' }}>{prod.spec}</td>
+                      <td style={{ padding: '6px', border: '1px solid #ddd', textAlign: 'right', fontWeight: 'bold', color: '#059669' }}>{prod.price.toLocaleString()} 원</td>
+                      <td style={{ padding: '6px', border: '1px solid #ddd', textAlign: 'center' }}>{prod.eco}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* 2. 보드 원판 단가표 */}
         {tableMainTab === 'board' && (
           <div>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
@@ -800,7 +894,7 @@ function CalculatorSection() {
           </div>
         )}
 
-        {/* 2. 표면재 단가표 */}
+        {/* 3. 표면재 단가표 */}
         {tableMainTab === 'surface' && (
           <div>
             <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' }}>
@@ -839,45 +933,12 @@ function CalculatorSection() {
             </table>
           </div>
         )}
-
-        {/* 3. reDoor 완성품 단가표 */}
-        {tableMainTab === 'reDoor' && (
-          <div>
-            <h4 style={{ margin: '0 0 10px 0', color: '#6d28d9' }}>✨ reDoor (Special/Premium PET+LPM, PP) 완제품 공급 단가표</h4>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-                <thead>
-                  <tr style={{ background: '#f5f3ff', borderTop: '2px solid #7c3aed' }}>
-                    <th style={{ padding: '8px', border: '1px solid #ddd' }}>구분</th>
-                    <th style={{ padding: '8px', border: '1px solid #ddd' }}>제품코드</th>
-                    <th style={{ padding: '8px', border: '1px solid #ddd' }}>제품명/패턴</th>
-                    <th style={{ padding: '8px', border: '1px solid #ddd' }}>규격</th>
-                    <th style={{ padding: '8px', border: '1px solid #ddd' }}>완성품 단가 (원)</th>
-                    <th style={{ padding: '8px', border: '1px solid #ddd' }}>등급</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {REDOOR_PRODUCTS.map((prod) => (
-                    <tr key={prod.code}>
-                      <td style={{ padding: '6px', border: '1px solid #ddd', textAlign: 'center', fontWeight: 'bold', color: '#6d28d9' }}>{prod.group}</td>
-                      <td style={{ padding: '6px', border: '1px solid #ddd', textAlign: 'center', fontWeight: 'bold' }}>{prod.code}</td>
-                      <td style={{ padding: '6px', border: '1px solid #ddd' }}>{prod.name}</td>
-                      <td style={{ padding: '6px', border: '1px solid #ddd', textAlign: 'center' }}>{prod.spec}</td>
-                      <td style={{ padding: '6px', border: '1px solid #ddd', textAlign: 'right', fontWeight: 'bold', color: '#059669' }}>{prod.price.toLocaleString()} 원</td>
-                      <td style={{ padding: '6px', border: '1px solid #ddd', textAlign: 'center' }}>{prod.eco}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* 하단 실시간 견적/원가 계산기 */}
+      {/* 하단 실시간 계산기 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
         <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-          <h3 style={{ fontSize: '15px', marginTop: 0, color: '#2563eb' }}>⚙️ 견적 조건 선택 (표 단가 연동)</h3>
+          <h3 style={{ fontSize: '15px', marginTop: 0, color: '#2563eb' }}>⚙️ 견적 조건 선택</h3>
           <div style={{ display: 'grid', gap: '8px', fontSize: '12px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
               <div>
