@@ -39,20 +39,37 @@ const BOARD_CONFIG = {
 const BOARD_SIZES = ['1220x2440', '1220x2800', '1220x3050', '1525x2440', '1830x2440'];
 const ECO_GRADES = ['E1', 'E0', 'SE0'];
 
+// 표면재 세부 규격 (두께 및 단위)
+const SURFACE_CONFIG: { [key: string]: { unit: '장' | 'm'; thicknesses: string[] } } = {
+  LPM: { unit: '장', thicknesses: ['기본'] },
+  PVC: { unit: 'm', thicknesses: ['0.07t', '0.09t', '0.1t', '0.12t', '0.15t', '0.17t', '0.2t', '0.25t'] },
+  PP: { unit: 'm', thicknesses: ['0.07t', '0.09t', '0.1t', '0.12t', '0.15t', '0.17t', '0.2t', '0.25t'] },
+  PET: { unit: 'm', thicknesses: ['0.15t', '0.2t', '0.25t', '0.3t'] },
+  ASA: { unit: 'm', thicknesses: ['0.15t', '0.2t', '0.25t', '0.3t'] },
+  포일: { unit: 'm', thicknesses: ['기본'] },
+};
+
 export default function Calculator() {
   const [costDb, setCostDb] = useState<{ [key: string]: number }>({});
-  
-  // 단가표 관리용 선택 탭/필터
+
+  // 1. 보드 단가표 관리 탭/필터
   const [tableBoard, setTableBoard] = useState<'MDF' | 'PB' | '합판'>('MDF');
   const [tableDensity, setTableDensity] = useState<string>('INT');
 
-  // 하단 실시간 산출 조건
+  // 2. 표면재 단가표 관리 탭
+  const [tableSurface, setTableSurface] = useState<string>('PVC');
+
+  // 3. 하단 실시간 견적 산출 조건
   const [boardType, setBoardType] = useState<'MDF' | 'PB' | '합판'>('MDF');
   const [thickness, setThickness] = useState('18t');
   const [boardSize, setBoardSize] = useState('1220x2440');
   const [density, setDensity] = useState('INT');
   const [ecoGrade, setEcoGrade] = useState('E1');
-  const [selectedSurface, setSelectedSurface] = useState('LPM_양면');
+
+  // 표면재 선택 상태
+  const [selectedSurfaceType, setSelectedSurfaceType] = useState('LPM');
+  const [selectedSurfaceThick, setSelectedSurfaceThick] = useState('기본');
+  const [processingType, setProcessingType] = useState<'양면' | '단면'>('양면');
 
   const [quantity, setQuantity] = useState<number>(100);
   const [transportCost, setTransportCost] = useState<number>(50000);
@@ -73,6 +90,10 @@ export default function Calculator() {
   useEffect(() => {
     setTableDensity(BOARD_CONFIG[tableBoard].densities[0]);
   }, [tableBoard]);
+
+  useEffect(() => {
+    setSelectedSurfaceThick(SURFACE_CONFIG[selectedSurfaceType].thicknesses[0]);
+  }, [selectedSurfaceType]);
 
   const fetchCostSettings = async () => {
     const { data } = await supabase.from('cost_settings').select('*');
@@ -109,7 +130,7 @@ export default function Calculator() {
       const { error } = await supabase.from('cost_settings').upsert(updates, { onConflict: 'category' });
       if (error) throw error;
 
-      alert('전체 원가 단가가 DB에 성공적으로 저장되었습니다!');
+      alert('보드 및 표면재 전체 원가 단가가 DB에 성공적으로 저장되었습니다!');
     } catch (err: any) {
       alert(`단가 저장 오류: ${err.message}`);
     }
@@ -149,18 +170,38 @@ export default function Calculator() {
     fetchCompetitorPrices();
   };
 
-  // 실시간 원가 산출 키 매칭 (비중 규격 포함)
+  // 1. 원판 자재비 계산
   const fullDensityKey = `${boardType}_${thickness}_${density}_${ecoGrade}`;
   const baseGradeKey = `${boardType}_${thickness}_${ecoGrade}`;
   const boardUnitCost = costDb[fullDensityKey] ?? costDb[baseGradeKey] ?? 0;
 
-  const surfaceUnitCost = costDb[selectedSurface] || 0;
-  const processingUnitCost = costDb['PROCESSING_BASE'] || 0;
-  const lossRate = costDb['LOSS_RATE'] || 0;
+  // 2. 표면재 자재비 계산 (요구사항: m당 단가 자재비는 1면당 2.5m 계산)
+  const surfaceKey = `SURFACE_${selectedSurfaceType}_${selectedSurfaceThick}`;
+  const rawSurfaceCost = costDb[surfaceKey] || 0;
+  const surfaceInfo = SURFACE_CONFIG[selectedSurfaceType];
 
-  const baseCostPerItem = (boardUnitCost + surfaceUnitCost + processingUnitCost) * (1 + lossRate / 100);
+  let calculatedSurfaceCost = 0;
+  let surfaceUsageCalcText = '';
+
+  if (surfaceInfo.unit === '장') {
+    // LPM (장당 단가)
+    const multiplier = processingType === '양면' ? 1 : 0.6;
+    calculatedSurfaceCost = rawSurfaceCost * multiplier;
+    surfaceUsageCalcText = `장당 ${rawSurfaceCost.toLocaleString()}원 (${processingType})`;
+  } else {
+    // m당 단가 (PVC, PET, ASA, PP, 포일 등) -> 1면당 2.5m 계산
+    const sideCount = processingType === '양면' ? 2 : 1;
+    const totalMetersUsed = 2.5 * sideCount; // 양면: 5.0m, 단면: 2.5m
+    calculatedSurfaceCost = rawSurfaceCost * totalMetersUsed;
+    surfaceUsageCalcText = `1면당 2.5m 기준 (총 ${totalMetersUsed}m × ${rawSurfaceCost.toLocaleString()}원)`;
+  }
+
+  const processingUnitCost = costDb['PROCESSING_BASE'] || 3000;
+  const lossRate = costDb['LOSS_RATE'] || 5;
+
+  const baseCostPerItem = (boardUnitCost + calculatedSurfaceCost + processingUnitCost) * (1 + lossRate / 100);
   const transportPerItem = quantity > 0 ? transportCost / quantity : 0;
-  
+
   const totalUnitCost = baseCostPerItem + transportPerItem;
   const totalCost = totalUnitCost * quantity;
 
@@ -179,19 +220,18 @@ export default function Calculator() {
         </div>
       </header>
 
-      {/* 1. 통합 보드 원가 단가 관리 표 (비중 규격 포함) */}
-      <div style={{ background: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '20px', marginBottom: '24px' }}>
+      {/* 1. 보드 자재 단가 관리 표 */}
+      <div style={{ background: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '20px', marginBottom: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
           <div>
-            <h2 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0, color: '#1e293b' }}>💾 저장된 보드 규격/비중/환경등급별 원가 단가표</h2>
-            <p style={{ fontSize: '12px', color: '#64748b', margin: '4px 0 0 0' }}>비중 규격별 단가를 입력하신 후 [전체 단가표 DB 저장]을 클릭하세요.</p>
+            <h2 style={{ fontSize: '17px', fontWeight: 'bold', margin: 0, color: '#1e293b' }}>1. 보드 원판 단가 설정 (MDF / PB / 합판)</h2>
+            <p style={{ fontSize: '12px', color: '#64748b', margin: '4px 0 0 0' }}>비중 규격별 E1, E0, SE0 원판 단가를 기입하세요.</p>
           </div>
           <button onClick={handleSaveAllCosts} style={{ background: '#059669', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>
             💾 전체 단가표 DB 저장
           </button>
         </div>
 
-        {/* 보드 종류 선택 탭 */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
           {(['MDF', 'PB', '합판'] as const).map((tab) => (
             <button
@@ -212,73 +252,55 @@ export default function Calculator() {
           ))}
         </div>
 
-        {/* 비중 규격 서브 필터 */}
-        <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#475569' }}>🔍 비중 규격 필터:</span>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            {BOARD_CONFIG[tableBoard].densities.map((den) => (
-              <button
-                key={den}
-                onClick={() => setTableDensity(den)}
-                style={{
-                  padding: '5px 12px',
-                  borderRadius: '4px',
-                  border: '1px solid #cbd5e1',
-                  background: tableDensity === den ? '#2563eb' : '#fff',
-                  color: tableDensity === den ? '#fff' : '#475569',
-                  fontWeight: 'bold',
-                  fontSize: '12px',
-                  cursor: 'pointer',
-                }}
-              >
-                {den}
-              </button>
-            ))}
-          </div>
+        <div style={{ background: '#f8fafc', padding: '8px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontWeight: 'bold', fontSize: '12px', color: '#475569' }}>비중 필터:</span>
+          {BOARD_CONFIG[tableBoard].densities.map((den) => (
+            <button
+              key={den}
+              onClick={() => setTableDensity(den)}
+              style={{
+                padding: '4px 10px',
+                borderRadius: '4px',
+                border: '1px solid #cbd5e1',
+                background: tableDensity === den ? '#2563eb' : '#fff',
+                color: tableDensity === den ? '#fff' : '#475569',
+                fontWeight: 'bold',
+                fontSize: '12px',
+                cursor: 'pointer',
+              }}
+            >
+              {den}
+            </button>
+          ))}
         </div>
 
-        {/* 단가 매트릭스 테이블 */}
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
               <tr style={{ background: '#f1f5f9', borderTop: '2px solid #cbd5e1', borderBottom: '1px solid #cbd5e1', textAlign: 'center' }}>
-                <th style={{ padding: '10px', border: '1px solid #e2e8f0', width: '120px' }}>두께 규격</th>
-                <th style={{ padding: '10px', border: '1px solid #e2e8f0', width: '100px' }}>비중 규격</th>
+                <th style={{ padding: '8px', border: '1px solid #e2e8f0', width: '120px' }}>두께</th>
+                <th style={{ padding: '8px', border: '1px solid #e2e8f0', width: '100px' }}>비중</th>
                 {ECO_GRADES.map((grade) => (
-                  <th key={grade} style={{ padding: '10px', border: '1px solid #e2e8f0' }}>
-                    {grade} 단가 (원)
-                  </th>
+                  <th key={grade} style={{ padding: '8px', border: '1px solid #e2e8f0' }}>{grade} 단가 (원)</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {BOARD_CONFIG[tableBoard].thicknesses.map((th) => (
                 <tr key={th} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={{ padding: '8px', border: '1px solid #e2e8f0', fontWeight: 'bold', background: '#f8fafc', textAlign: 'center' }}>
-                    {tableBoard} {th}
-                  </td>
-                  <td style={{ padding: '8px', border: '1px solid #e2e8f0', textAlign: 'center', color: '#2563eb', fontWeight: 'bold' }}>
-                    {tableDensity}
-                  </td>
+                  <td style={{ padding: '6px', border: '1px solid #e2e8f0', fontWeight: 'bold', background: '#f8fafc', textAlign: 'center' }}>{tableBoard} {th}</td>
+                  <td style={{ padding: '6px', border: '1px solid #e2e8f0', textAlign: 'center', color: '#2563eb', fontWeight: 'bold' }}>{tableDensity}</td>
                   {ECO_GRADES.map((grade) => {
                     const cellKey = `${tableBoard}_${th}_${tableDensity}_${grade}`;
                     const costVal = costDb[cellKey] ?? 0;
                     return (
-                      <td key={grade} style={{ padding: '6px', border: '1px solid #e2e8f0' }}>
+                      <td key={grade} style={{ padding: '4px', border: '1px solid #e2e8f0' }}>
                         <input
                           type="number"
                           value={costVal === 0 ? '' : costVal}
                           placeholder="0"
                           onChange={(e) => handleCellChange(cellKey, Number(e.target.value))}
-                          style={{
-                            width: '95%',
-                            padding: '6px',
-                            textAlign: 'right',
-                            border: '1px solid #cbd5e1',
-                            borderRadius: '4px',
-                            fontWeight: costVal > 0 ? 'bold' : 'normal',
-                            color: costVal > 0 ? '#0f172a' : '#94a3b8',
-                          }}
+                          style={{ width: '95%', padding: '4px', textAlign: 'right', border: '1px solid #cbd5e1', borderRadius: '4px' }}
                         />
                       </td>
                     );
@@ -288,29 +310,71 @@ export default function Calculator() {
             </tbody>
           </table>
         </div>
+      </div>
 
-        {/* 표면재 및 가공 부대비용 단가 */}
-        <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed #cbd5e1', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+      {/* 2. 표면재 자재 단가 관리 표 (LPM, PVC, PP, PET, ASA, 포일 / 두께별 구분) */}
+      <div style={{ background: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '20px', marginBottom: '24px' }}>
+        <h2 style={{ fontSize: '17px', fontWeight: 'bold', margin: '0 0 12px 0', color: '#1e293b' }}>2. 표면재 단가 설정 (LPM / PVC / PP / PET / ASA / 포일)</h2>
+
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+          {Object.keys(SURFACE_CONFIG).map((surf) => (
+            <button
+              key={surf}
+              onClick={() => setTableSurface(surf)}
+              style={{
+                padding: '6px 14px',
+                borderRadius: '6px',
+                border: '1px solid #cbd5e1',
+                background: tableSurface === surf ? '#0284c7' : '#f8fafc',
+                color: tableSurface === surf ? '#fff' : '#334155',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                fontSize: '13px',
+              }}
+            >
+              {surf} ({SURFACE_CONFIG[surf].unit}당)
+            </button>
+          ))}
+        </div>
+
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ background: '#f0f9ff', borderTop: '2px solid #0284c7', borderBottom: '1px solid #cbd5e1', textAlign: 'center' }}>
+                <th style={{ padding: '8px', border: '1px solid #e2e8f0' }}>표면재 종류</th>
+                <th style={{ padding: '8px', border: '1px solid #e2e8f0' }}>두께 규격</th>
+                <th style={{ padding: '8px', border: '1px solid #e2e8f0' }}>단가 단위</th>
+                <th style={{ padding: '8px', border: '1px solid #e2e8f0' }}>단가 (원)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {SURFACE_CONFIG[tableSurface].thicknesses.map((th) => {
+                const sKey = `SURFACE_${tableSurface}_${th}`;
+                const sCost = costDb[sKey] ?? 0;
+                return (
+                  <tr key={th} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '6px', border: '1px solid #e2e8f0', textAlign: 'center', fontWeight: 'bold' }}>{tableSurface}</td>
+                    <td style={{ padding: '6px', border: '1px solid #e2e8f0', textAlign: 'center', color: '#0369a1', fontWeight: 'bold' }}>{th}</td>
+                    <td style={{ padding: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>원 / {SURFACE_CONFIG[tableSurface].unit}</td>
+                    <td style={{ padding: '4px', border: '1px solid #e2e8f0' }}>
+                      <input
+                        type="number"
+                        value={sCost === 0 ? '' : sCost}
+                        placeholder="0"
+                        onChange={(e) => handleCellChange(sKey, Number(e.target.value))}
+                        style={{ width: '95%', padding: '4px', textAlign: 'right', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px dashed #cbd5e1', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
           <div>
-            <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569' }}>LPM 양면 단가 (원)</label>
-            <input
-              type="number"
-              value={costDb['LPM_양면'] || ''}
-              onChange={(e) => handleCellChange('LPM_양면', Number(e.target.value))}
-              style={{ width: '100%', padding: '6px', marginTop: '4px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569' }}>LPM 단면 단가 (원)</label>
-            <input
-              type="number"
-              value={costDb['LPM_단면'] || ''}
-              onChange={(e) => handleCellChange('LPM_단면', Number(e.target.value))}
-              style={{ width: '100%', padding: '6px', marginTop: '4px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569' }}>기본 임가공비 (원/장)</label>
+            <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569' }}>기본 가공 임가공비 (원/장)</label>
             <input
               type="number"
               value={costDb['PROCESSING_BASE'] || ''}
@@ -330,11 +394,11 @@ export default function Calculator() {
         </div>
       </div>
 
-      {/* 2. 산출 조건 선택 및 실시간 분석 산출 */}
+      {/* 3. 실시간 견적 산출기 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px', marginBottom: '32px' }}>
         <div style={{ background: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #d1d5db' }}>
-          <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: 0, marginBottom: '16px', color: '#2563eb' }}>⚙️ 견적 조건 선택 (표 단가 실시간 연동)</h2>
-          
+          <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: 0, marginBottom: '16px', color: '#2563eb' }}>⚙️ 견적 조건 선택 (표 단가 자동 연동)</h2>
+
           <div style={{ display: 'grid', gap: '12px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
               <div>
@@ -394,16 +458,50 @@ export default function Calculator() {
               </div>
             </div>
 
-            <div style={{ background: '#eff6ff', padding: '10px', borderRadius: '6px', fontSize: '13px', color: '#1e40af' }}>
-              매칭 항목: <strong>{fullDensityKey}</strong> | 연동 원판가: <strong>{boardUnitCost > 0 ? `${boardUnitCost.toLocaleString()}원` : '0원 (상단 표에서 단가 입력)'}</strong>
+            {/* 표면재 세부 선택 */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 'bold' }}>표면재 종류</label>
+                <select
+                  value={selectedSurfaceType}
+                  onChange={(e) => setSelectedSurfaceType(e.target.value)}
+                  style={{ width: '100%', padding: '6px', marginTop: '4px', borderRadius: '4px', border: '1px solid #ccc' }}
+                >
+                  {Object.keys(SURFACE_CONFIG).map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 'bold' }}>표면재 두께</label>
+                <select
+                  value={selectedSurfaceThick}
+                  onChange={(e) => setSelectedSurfaceThick(e.target.value)}
+                  style={{ width: '100%', padding: '6px', marginTop: '4px', borderRadius: '4px', border: '1px solid #ccc' }}
+                >
+                  {SURFACE_CONFIG[selectedSurfaceType].thicknesses.map((th) => (
+                    <option key={th} value={th}>{th}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 'bold' }}>가공 구분</label>
+                <select
+                  value={processingType}
+                  onChange={(e) => setProcessingType(e.target.value as '양면' | '단면')}
+                  style={{ width: '100%', padding: '6px', marginTop: '4px', borderRadius: '4px', border: '1px solid #ccc' }}
+                >
+                  <option value="양면">양면</option>
+                  <option value="단면">단면</option>
+                </select>
+              </div>
             </div>
 
-            <div>
-              <label style={{ fontSize: '13px', fontWeight: 'bold' }}>표면재 선택</label>
-              <select value={selectedSurface} onChange={(e) => setSelectedSurface(e.target.value)} style={{ width: '100%', padding: '8px', marginTop: '4px', borderRadius: '4px', border: '1px solid #ccc' }}>
-                <option value="LPM_양면">LPM 양면 ({costDb['LPM_양면']?.toLocaleString() || 0}원)</option>
-                <option value="LPM_단면">LPM 단면 ({costDb['LPM_단면']?.toLocaleString() || 0}원)</option>
-              </select>
+            <div style={{ background: '#eff6ff', padding: '10px', borderRadius: '6px', fontSize: '12px', color: '#1e40af' }}>
+              <div>보드 원판 단가: <strong>{boardUnitCost.toLocaleString()} 원</strong></div>
+              <div>표면재 자재비: <strong>{Math.round(calculatedSurfaceCost).toLocaleString()} 원</strong> ({selectedSurfaceType} {selectedSurfaceThick} / {surfaceUsageCalcText})</div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
@@ -423,7 +521,7 @@ export default function Calculator() {
         <div style={{ background: '#f0fdf4', padding: '20px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
           <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: 0, marginBottom: '16px', color: '#166534' }}>📊 당사 견적 분석</h2>
           <div style={{ background: '#fff', padding: '12px', borderRadius: '6px', marginBottom: '8px', border: '1px solid #dcfce7' }}>
-            <div style={{ fontSize: '12px', color: '#65a30d' }}>장당 제조원가 ({fullDensityKey} 기준)</div>
+            <div style={{ fontSize: '12px', color: '#65a30d' }}>장당 제조원가</div>
             <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#14532d' }}>{Math.round(totalUnitCost).toLocaleString()} 원</div>
           </div>
           <div style={{ background: '#16a34a', color: '#fff', padding: '14px', borderRadius: '6px', marginBottom: '8px' }}>
@@ -438,13 +536,13 @@ export default function Calculator() {
         </div>
       </div>
 
-      {/* 3. 경쟁사 단가 기록 */}
+      {/* 4. 경쟁사 단가 기록 */}
       <div style={{ background: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '20px' }}>
         <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: 0, marginBottom: '16px', color: '#1e293b' }}>🔍 경쟁사 판매 단가 기록</h2>
         <form onSubmit={handleAddCompetitorPrice} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', marginBottom: '20px', background: '#f8fafc', padding: '12px', borderRadius: '6px' }}>
           <input type="text" placeholder="경쟁업체명" value={compName} onChange={(e) => setCompName(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }} required />
           <input type="text" placeholder="규격 (예: MDF 18t 1220x2440 E1)" value={compBoard} onChange={(e) => setCompBoard(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }} />
-          <input type="text" placeholder="표면재 (예: LPM 양면)" value={compSurface} onChange={(e) => setCompSurface(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }} />
+          <input type="text" placeholder="표면재 (예: PET 0.2t 양면)" value={compSurface} onChange={(e) => setCompSurface(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }} />
           <input type="number" placeholder="판매 단가" value={compPrice} onChange={(e) => setCompPrice(e.target.value === '' ? '' : Number(e.target.value))} style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }} required />
           <input type="text" placeholder="비고" value={compMemo} onChange={(e) => setCompMemo(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }} />
           <button type="submit" style={{ background: '#0284c7', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>+ 저장</button>
