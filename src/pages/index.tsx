@@ -53,16 +53,6 @@ interface Order {
   order_items: OrderItem[];
 }
 
-interface CompetitorPrice {
-  id: string;
-  competitor_name: string;
-  board_type: string;
-  surface_type: string;
-  unit_price: number;
-  memo: string;
-  created_at: string;
-}
-
 interface EstimateItem {
   id: number;
   itemName: string;
@@ -100,65 +90,203 @@ const SURFACE_CONFIG: { [key: string]: { unit: '장' | 'm'; thicknesses: string[
   포일: { unit: 'm', thicknesses: ['기본'] },
 };
 
+// 관리자 기본 접속 비밀번호
+const ADMIN_PASSWORD = '1234';
+
 export default function MainIntegratedSystem() {
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [activeTab, setActiveTab] = useState<'order' | 'admin' | 'calculator' | 'estimate' | 'companies'>('order');
+  const [passwordInput, setPasswordInput] = useState('');
+  const [showLoginModal, setShowLoginModal] = useState(false);
+
+  const handleAdminLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwordInput === ADMIN_PASSWORD) {
+      setIsAdminLoggedIn(true);
+      setShowLoginModal(false);
+      setPasswordInput('');
+      setActiveTab('admin');
+      alert('관리자 모드로 로그인되었습니다.');
+    } else {
+      alert('비밀번호가 일치하지 않습니다.');
+    }
+  };
+
+  const handleLogout = () => {
+    setIsAdminLoggedIn(false);
+    setActiveTab('order');
+    alert('로그아웃되었습니다 (발주처 화면으로 전환).');
+  };
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '16px', fontFamily: 'sans-serif', background: '#f8fafc', minHeight: '100vh' }}>
+      {/* 📌 마스터 헤더 */}
       <header style={{ background: '#1e293b', padding: '16px 20px', borderRadius: '12px', color: '#fff', marginBottom: '20px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: '22px', fontWeight: 'bold' }}>🏭 표면재 가공 통합 생산/원가/발주 관리 시스템</h1>
-            <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#94a3b8' }}>모든 발주, 수주, 원가 단가, 견적서 관리를 한곳에서 완벽하게 연동합니다.</p>
+            <h1 style={{ margin: 0, fontSize: '22px', fontWeight: 'bold' }}>🏭 표면재 가공 통합 발주/생산 관리 시스템</h1>
+            <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#94a3b8' }}>
+              {isAdminLoggedIn ? '🔑 관리자 모드 접속 중 (모든 데이터 접근 권한 활성화)' : '📋 발주처 전용 발주 접수 화면'}
+            </p>
           </div>
-          <div style={{ background: '#334155', padding: '6px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold', color: '#38bdf8' }}>
-            ● Supabase DB 데이터 동기화 완료
+
+          <div>
+            {isAdminLoggedIn ? (
+              <button onClick={handleLogout} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}>
+                🔓 관리자 로그아웃
+              </button>
+            ) : (
+              <button onClick={() => setShowLoginModal(true)} style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}>
+                🔒 당사 관리자 로그인
+              </button>
+            )}
           </div>
         </div>
 
+        {/* 탭 메인 네비게이션 */}
         <nav style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          {[
-            { id: 'order', label: '📋 발주서 작성', desc: '발주처 전용' },
-            { id: 'admin', label: '🏭 수주 관리 대시보드', desc: '생산/출고 현황' },
-            { id: 'calculator', label: '🧮 원가 단가 관리 & 계산기', desc: '단가표 / 마진 산출' },
-            { id: 'estimate', label: '📄 견적서 작성 및 출력', desc: 'A4 정식 견적서' },
-            { id: 'companies', label: '🏢 거래처 관리', desc: '거래처 등록' },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              style={{
-                padding: '10px 16px',
-                borderRadius: '8px',
-                border: 'none',
-                background: activeTab === tab.id ? '#2563eb' : '#334155',
-                color: '#fff',
-                fontWeight: 'bold',
-                fontSize: '13px',
-                cursor: 'pointer',
-                textAlign: 'left',
-              }}
-            >
-              <div>{tab.label}</div>
-              <div style={{ fontSize: '10px', opacity: 0.7, fontWeight: 'normal' }}>{tab.desc}</div>
-            </button>
-          ))}
+          <button
+            onClick={() => setActiveTab('order')}
+            style={{
+              padding: '10px 16px',
+              borderRadius: '8px',
+              border: 'none',
+              background: activeTab === 'order' ? '#2563eb' : '#334155',
+              color: '#fff',
+              fontWeight: 'bold',
+              fontSize: '13px',
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
+          >
+            <div>📋 발주서 작성</div>
+            <div style={{ fontSize: '10px', opacity: 0.7, fontWeight: 'normal' }}>발주처 공용</div>
+          </button>
+
+          {/* 관리자 모드 시에만 오픈되는 메뉴들 */}
+          {isAdminLoggedIn && (
+            <>
+              <button
+                onClick={() => setActiveTab('admin')}
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: activeTab === 'admin' ? '#2563eb' : '#334155',
+                  color: '#fff',
+                  fontWeight: 'bold',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <div>🏭 수주 관리 대시보드</div>
+                <div style={{ fontSize: '10px', opacity: 0.7, fontWeight: 'normal' }}>생산/출고 상태</div>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('calculator')}
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: activeTab === 'calculator' ? '#2563eb' : '#334155',
+                  color: '#fff',
+                  fontWeight: 'bold',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <div>🧮 원가 단가 관리 & 계산기</div>
+                <div style={{ fontSize: '10px', opacity: 0.7, fontWeight: 'normal' }}>단가표 / 마진 산출</div>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('estimate')}
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: activeTab === 'estimate' ? '#2563eb' : '#334155',
+                  color: '#fff',
+                  fontWeight: 'bold',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <div>📄 견적서 작성 및 출력</div>
+                <div style={{ fontSize: '10px', opacity: 0.7, fontWeight: 'normal' }}>A4 정식 견적서</div>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('companies')}
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: activeTab === 'companies' ? '#2563eb' : '#334155',
+                  color: '#fff',
+                  fontWeight: 'bold',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <div>🏢 거래처 관리</div>
+                <div style={{ fontSize: '10px', opacity: 0.7, fontWeight: 'normal' }}>거래처 등록</div>
+              </button>
+            </>
+          )}
         </nav>
       </header>
 
+      {/* 📌 메인 탭 출력 영역 */}
       <main>
         {activeTab === 'order' && <OrderSection />}
-        {activeTab === 'admin' && <AdminSection />}
-        {activeTab === 'calculator' && <CalculatorSection />}
-        {activeTab === 'estimate' && <EstimateSection />}
-        {activeTab === 'companies' && <CompaniesSection />}
+        {isAdminLoggedIn && (
+          <>
+            {activeTab === 'admin' && <AdminSection />}
+            {activeTab === 'calculator' && <CalculatorSection />}
+            {activeTab === 'estimate' && <EstimateSection />}
+            {activeTab === 'companies' && <CompaniesSection />}
+          </>
+        )}
       </main>
+
+      {/* 🔒 관리자 로그인 모달 */}
+      {showLoginModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
+          <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', width: '320px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', textAlign: 'center', color: '#1e293b' }}>🔒 당사 관리자 로그인</h3>
+            <form onSubmit={handleAdminLogin}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '6px', color: '#475569' }}>관리자 비밀번호</label>
+                <input
+                  type="password"
+                  placeholder="비밀번호 입력 (기본: 1234)"
+                  value={passwordInput}
+                  onChange={(e) => setPasswordInput(e.target.value)}
+                  style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+                  required
+                  autoFocus
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button type="button" onClick={() => setShowLoginModal(false)} style={{ flex: 1, padding: '10px', border: 'none', background: '#94a3b8', color: '#fff', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>취소</button>
+                <button type="submit" style={{ flex: 1, padding: '10px', border: 'none', background: '#2563eb', color: '#fff', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>로그인</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // ==========================================
-// 1. 발주서 작성 탭
+// 1. 발주서 작성 탭 (발주처 전용)
 // ==========================================
 function OrderSection() {
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -250,7 +378,7 @@ function OrderSection() {
       const { error: itemsError } = await supabase.from('order_items').insert(orderItemsToInsert);
       if (itemsError) throw itemsError;
 
-      alert(`발주서 제출이 완료되었습니다! (발주번호: ${orderNumber})`);
+      alert(`발주서가 성공적으로 제출되었습니다! (발주번호: ${orderNumber})`);
       setSelectedCompany('');
       setDeliveryDate('');
       setOverallMemo('');
@@ -269,7 +397,7 @@ function OrderSection() {
             <input
               type="text"
               list="company-list"
-              placeholder="등록된 거래처 검색 또는 입력"
+              placeholder="등록된 거래처 검색 또는 직접 입력"
               value={selectedCompany}
               onChange={(e) => setSelectedCompany(e.target.value)}
               style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }}
@@ -401,7 +529,7 @@ function OrderSection() {
 }
 
 // ==========================================
-// 2. 수주 관리 대시보드 탭
+// 2. 수주 관리 대시보드 탭 (관리자 전용)
 // ==========================================
 function AdminSection() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -423,7 +551,7 @@ function AdminSection() {
 
   return (
     <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-      <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: 0, marginBottom: '16px' }}>🏭 수주 접수 현황 대시보드</h2>
+      <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: 0, marginBottom: '16px' }}>🏭 수주 접수 현황 대시보드 (관리자 전용)</h2>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
         <thead>
           <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #cbd5e1', textAlign: 'left' }}>
@@ -460,7 +588,6 @@ function AdminSection() {
         </tbody>
       </table>
 
-      {/* 팝업 상세 모달 */}
       {selectedOrder && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <div style={{ background: '#fff', padding: '24px', borderRadius: '8px', maxWidth: '700px', width: '90%', maxHeight: '80vh', overflowY: 'auto' }}>
@@ -501,7 +628,7 @@ function AdminSection() {
 }
 
 // ==========================================
-// 3. 원가 단가 관리 & 실시간 산출기 탭
+// 3. 원가 단가 관리 & 실시간 산출기 탭 (관리자 전용)
 // ==========================================
 function CalculatorSection() {
   const [costDb, setCostDb] = useState<{ [key: string]: number }>({});
@@ -511,7 +638,6 @@ function CalculatorSection() {
 
   const [boardType, setBoardType] = useState<'MDF' | 'PB' | '합판'>('MDF');
   const [thickness, setThickness] = useState('18t');
-  const [boardSize, setBoardSize] = useState('1220x2440');
   const [density, setDensity] = useState('INT');
   const [ecoGrade, setEcoGrade] = useState('E1');
 
@@ -553,12 +679,10 @@ function CalculatorSection() {
     alert('보드 및 표면재 전체 원가 단가가 DB에 성공적으로 저장되었습니다!');
   };
 
-  // 1. 원판 자재비 연동 계산
   const fullDensityKey = `${boardType}_${thickness}_${density}_${ecoGrade}`;
   const baseGradeKey = `${boardType}_${thickness}_${ecoGrade}`;
   const boardUnitCost = costDb[fullDensityKey] ?? costDb[baseGradeKey] ?? 0;
 
-  // 2. 표면재 자재비 연동 계산 (m당 단가는 1면당 2.5m 적용)
   const surfaceKey = `SURFACE_${selectedSurfaceType}_${selectedSurfaceThick}`;
   const rawSurfaceCost = costDb[surfaceKey] || 0;
   const surfaceInfo = SURFACE_CONFIG[selectedSurfaceType];
@@ -582,13 +706,13 @@ function CalculatorSection() {
   return (
     <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h2 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0 }}>🧮 원가 단가 매트릭스 & 실시간 산출기</h2>
+        <h2 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0 }}>🧮 원가 단가 매트릭스 & 실시간 산출기 (관리자 전용)</h2>
         <button onClick={handleSaveAllCosts} style={{ background: '#059669', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
           💾 전체 단가표 DB 저장
         </button>
       </div>
 
-      {/* 1. 보드 단가표 */}
+      {/* 보드 단가표 */}
       <div style={{ border: '1px solid #e2e8f0', padding: '16px', borderRadius: '8px', marginBottom: '16px' }}>
         <h3 style={{ fontSize: '15px', margin: '0 0 10px 0', color: '#1e293b' }}>1. 보드 원판 단가 기입 (MDF / PB / 합판)</h3>
         <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
@@ -632,7 +756,7 @@ function CalculatorSection() {
         </div>
       </div>
 
-      {/* 2. 표면재 단가표 */}
+      {/* 표면재 단가표 */}
       <div style={{ border: '1px solid #e2e8f0', padding: '16px', borderRadius: '8px', marginBottom: '20px' }}>
         <h3 style={{ fontSize: '15px', margin: '0 0 10px 0', color: '#1e293b' }}>2. 표면재 단가 기입 (LPM, PVC, PP, PET, ASA, 포일)</h3>
         <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', flexWrap: 'wrap' }}>
@@ -668,7 +792,7 @@ function CalculatorSection() {
         </table>
       </div>
 
-      {/* 3. 실시간 산출 결과 */}
+      {/* 실시간 산출 결과 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
         <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
           <h3 style={{ fontSize: '15px', marginTop: 0 }}>⚙️ 견적 조건 선택</h3>
@@ -752,7 +876,7 @@ function CalculatorSection() {
 }
 
 // ==========================================
-// 4. 견적서 작성 및 A4/PDF 출력 탭
+// 4. 견적서 작성 및 A4/PDF 출력 탭 (관리자 전용)
 // ==========================================
 function EstimateSection() {
   const [items, setItems] = useState<EstimateItem[]>([
@@ -766,7 +890,7 @@ function EstimateSection() {
   return (
     <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-        <h2 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0 }}>📄 정식 견적서 작성 및 A4/PDF 출력</h2>
+        <h2 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0 }}>📄 정식 견적서 작성 및 A4/PDF 출력 (관리자 전용)</h2>
         <button onClick={() => window.print()} style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>🖨️ A4/PDF 출력</button>
       </div>
       <div style={{ border: '2px solid #333', padding: '20px' }}>
@@ -780,7 +904,7 @@ function EstimateSection() {
 }
 
 // ==========================================
-// 5. 거래처 관리 탭
+// 5. 거래처 관리 탭 (관리자 전용)
 // ==========================================
 function CompaniesSection() {
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -805,7 +929,7 @@ function CompaniesSection() {
 
   return (
     <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-      <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: 0, marginBottom: '16px' }}>🏢 거래처 등록 및 관리</h2>
+      <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: 0, marginBottom: '16px' }}>🏢 거래처 등록 및 관리 (관리자 전용)</h2>
       <form onSubmit={handleAdd} style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
         <input type="text" placeholder="신규 거래처명" value={name} onChange={(e) => setName(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc', width: '250px' }} required />
         <button type="submit" style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>+ 거래처 추가</button>
