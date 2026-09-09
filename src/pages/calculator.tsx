@@ -21,7 +21,7 @@ interface CompetitorPrice {
   created_at: string;
 }
 
-const BOARD_SPECS = {
+const BOARD_CONFIG = {
   MDF: {
     thicknesses: ['2.7t', '3t', '4.5t', '6t', '12t', '15t', '18t', '20t', '22t', '25t', '30t'],
     densities: ['INT', 'DL', 'D', 'R'],
@@ -40,23 +40,13 @@ const BOARD_SIZES = ['1220x2440', '1220x2800', '1220x3050', '1525x2440', '1830x2
 const ECO_GRADES = ['E1', 'E0', 'SE0'];
 
 export default function Calculator() {
-  const [costDb, setCostDb] = useState<{ [key: string]: number }>({
-    'MDF_18t_E1': 15000,
-    'MDF_18t_E0': 16500,
-    'MDF_18t_SE0': 18000,
-    'MDF_15t_E1': 13000,
-    'PB_18t_E1': 12000,
-    'LPM_양면': 5000,
-    'LPM_단면': 3000,
-    'PROCESSING_BASE': 3000,
-    'LOSS_RATE': 5,
-    'TARGET_MARGIN': 15,
-  });
+  const [costDb, setCostDb] = useState<{ [key: string]: number }>({});
+  
+  // 단가표 관리용 선택 탭/필터
+  const [tableBoard, setTableBoard] = useState<'MDF' | 'PB' | '합판'>('MDF');
+  const [tableDensity, setTableDensity] = useState<string>('INT');
 
-  // 표 단가 관리용 현재 선택 탭
-  const [activeBoardTab, setActiveBoardTab] = useState<'MDF' | 'PB' | '합판'>('MDF');
-
-  // 하단 견적 산출기 선택 상태
+  // 하단 실시간 산출 조건
   const [boardType, setBoardType] = useState<'MDF' | 'PB' | '합판'>('MDF');
   const [thickness, setThickness] = useState('18t');
   const [boardSize, setBoardSize] = useState('1220x2440');
@@ -80,9 +70,13 @@ export default function Calculator() {
     fetchCompetitorPrices();
   }, []);
 
+  useEffect(() => {
+    setTableDensity(BOARD_CONFIG[tableBoard].densities[0]);
+  }, [tableBoard]);
+
   const fetchCostSettings = async () => {
     const { data } = await supabase.from('cost_settings').select('*');
-    if (data && data.length > 0) {
+    if (data) {
       const dbMap: { [key: string]: number } = {};
       data.forEach((item: CostSetting) => {
         dbMap[item.category] = Number(item.unit_cost);
@@ -97,14 +91,14 @@ export default function Calculator() {
     if (data) setCompetitorList(data);
   };
 
-  const handleCellCostChange = (key: string, value: number) => {
+  const handleCellChange = (key: string, value: number) => {
     setCostDb((prev) => ({
       ...prev,
       [key]: value,
     }));
   };
 
-  const handleSaveCostDb = async () => {
+  const handleSaveAllCosts = async () => {
     try {
       const updates = Object.keys(costDb).map((key) => ({
         category: key,
@@ -115,9 +109,9 @@ export default function Calculator() {
       const { error } = await supabase.from('cost_settings').upsert(updates, { onConflict: 'category' });
       if (error) throw error;
 
-      alert('전체 원가 단가표가 DB에 성공적으로 저장되었습니다!');
+      alert('전체 원가 단가가 DB에 성공적으로 저장되었습니다!');
     } catch (err: any) {
-      alert(`단가 저장 중 오류 발생: ${err.message}`);
+      alert(`단가 저장 오류: ${err.message}`);
     }
   };
 
@@ -155,10 +149,10 @@ export default function Calculator() {
     fetchCompetitorPrices();
   };
 
-  // 단가 매칭 우선순위 (세부 키 -> 기본 키)
-  const fullSpecKey = `${boardType}_${thickness}_${boardSize}_${ecoGrade}`;
-  const baseSpecKey = `${boardType}_${thickness}_${ecoGrade}`;
-  const boardUnitCost = costDb[fullSpecKey] ?? costDb[baseSpecKey] ?? 0;
+  // 실시간 원가 산출 키 매칭 (비중 규격 포함)
+  const fullDensityKey = `${boardType}_${thickness}_${density}_${ecoGrade}`;
+  const baseGradeKey = `${boardType}_${thickness}_${ecoGrade}`;
+  const boardUnitCost = costDb[fullDensityKey] ?? costDb[baseGradeKey] ?? 0;
 
   const surfaceUnitCost = costDb[selectedSurface] || 0;
   const processingUnitCost = costDb['PROCESSING_BASE'] || 0;
@@ -178,37 +172,37 @@ export default function Calculator() {
   return (
     <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '20px', fontFamily: 'sans-serif' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', paddingBottom: '12px', borderBottom: '2px solid #333' }}>
-        <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold' }}>🧮 보드 규격/등급별 원가 단가표 관리기</h1>
+        <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold' }}>🧮 원가 단가 관리 및 견적 산출기</h1>
         <div style={{ display: 'flex', gap: '10px' }}>
           <Link href="/estimate" style={{ background: '#2563eb', color: '#fff', padding: '6px 12px', borderRadius: '4px', textDecoration: 'none', fontWeight: 'bold', fontSize: '13px' }}>📄 견적서 작성</Link>
           <Link href="/admin" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: 'bold' }}>수주 대시보드 ➔</Link>
         </div>
       </header>
 
-      {/* 1. 보드 종류별 규격 & 등급 원가 단가 매트릭스 표 */}
+      {/* 1. 통합 보드 원가 단가 관리 표 (비중 규격 포함) */}
       <div style={{ background: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '20px', marginBottom: '24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
           <div>
-            <h2 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0, color: '#1e293b' }}>📋 보드 종류별 규격/등급 원가 단가표</h2>
-            <p style={{ fontSize: '12px', color: '#64748b', margin: '4px 0 0 0' }}>두께 및 환경 등급별 원판 단가를 아래 표에서 직접 입력 후 저장하세요.</p>
+            <h2 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0, color: '#1e293b' }}>💾 저장된 보드 규격/비중/환경등급별 원가 단가표</h2>
+            <p style={{ fontSize: '12px', color: '#64748b', margin: '4px 0 0 0' }}>비중 규격별 단가를 입력하신 후 [전체 단가표 DB 저장]을 클릭하세요.</p>
           </div>
-          <button onClick={handleSaveCostDb} style={{ background: '#10b981', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>
+          <button onClick={handleSaveAllCosts} style={{ background: '#059669', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>
             💾 전체 단가표 DB 저장
           </button>
         </div>
 
-        {/* 보드 탭 버튼 */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+        {/* 보드 종류 선택 탭 */}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
           {(['MDF', 'PB', '합판'] as const).map((tab) => (
             <button
               key={tab}
-              onClick={() => setActiveBoardTab(tab)}
+              onClick={() => setTableBoard(tab)}
               style={{
                 padding: '8px 16px',
                 borderRadius: '6px',
                 border: '1px solid #cbd5e1',
-                background: activeBoardTab === tab ? '#2563eb' : '#f8fafc',
-                color: activeBoardTab === tab ? '#fff' : '#334155',
+                background: tableBoard === tab ? '#1e40af' : '#f8fafc',
+                color: tableBoard === tab ? '#fff' : '#334155',
                 fontWeight: 'bold',
                 cursor: 'pointer',
               }}
@@ -218,12 +212,38 @@ export default function Calculator() {
           ))}
         </div>
 
+        {/* 비중 규격 서브 필터 */}
+        <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#475569' }}>🔍 비중 규격 필터:</span>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {BOARD_CONFIG[tableBoard].densities.map((den) => (
+              <button
+                key={den}
+                onClick={() => setTableDensity(den)}
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: '4px',
+                  border: '1px solid #cbd5e1',
+                  background: tableDensity === den ? '#2563eb' : '#fff',
+                  color: tableDensity === den ? '#fff' : '#475569',
+                  fontWeight: 'bold',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >
+                {den}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* 단가 매트릭스 테이블 */}
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'center' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
-              <tr style={{ background: '#f1f5f9', borderTop: '2px solid #cbd5e1', borderBottom: '1px solid #cbd5e1' }}>
-                <th style={{ padding: '10px', border: '1px solid #e2e8f0', width: '120px' }}>두께</th>
+              <tr style={{ background: '#f1f5f9', borderTop: '2px solid #cbd5e1', borderBottom: '1px solid #cbd5e1', textAlign: 'center' }}>
+                <th style={{ padding: '10px', border: '1px solid #e2e8f0', width: '120px' }}>두께 규격</th>
+                <th style={{ padding: '10px', border: '1px solid #e2e8f0', width: '100px' }}>비중 규격</th>
                 {ECO_GRADES.map((grade) => (
                   <th key={grade} style={{ padding: '10px', border: '1px solid #e2e8f0' }}>
                     {grade} 단가 (원)
@@ -232,13 +252,16 @@ export default function Calculator() {
               </tr>
             </thead>
             <tbody>
-              {BOARD_SPECS[activeBoardTab].thicknesses.map((th) => (
+              {BOARD_CONFIG[tableBoard].thicknesses.map((th) => (
                 <tr key={th} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={{ padding: '8px', border: '1px solid #e2e8f0', fontWeight: 'bold', background: '#f8fafc' }}>
-                    {activeBoardTab} {th}
+                  <td style={{ padding: '8px', border: '1px solid #e2e8f0', fontWeight: 'bold', background: '#f8fafc', textAlign: 'center' }}>
+                    {tableBoard} {th}
+                  </td>
+                  <td style={{ padding: '8px', border: '1px solid #e2e8f0', textAlign: 'center', color: '#2563eb', fontWeight: 'bold' }}>
+                    {tableDensity}
                   </td>
                   {ECO_GRADES.map((grade) => {
-                    const cellKey = `${activeBoardTab}_${th}_${grade}`;
+                    const cellKey = `${tableBoard}_${th}_${tableDensity}_${grade}`;
                     const costVal = costDb[cellKey] ?? 0;
                     return (
                       <td key={grade} style={{ padding: '6px', border: '1px solid #e2e8f0' }}>
@@ -246,9 +269,9 @@ export default function Calculator() {
                           type="number"
                           value={costVal === 0 ? '' : costVal}
                           placeholder="0"
-                          onChange={(e) => handleCellCostChange(cellKey, Number(e.target.value))}
+                          onChange={(e) => handleCellChange(cellKey, Number(e.target.value))}
                           style={{
-                            width: '90%',
+                            width: '95%',
                             padding: '6px',
                             textAlign: 'right',
                             border: '1px solid #cbd5e1',
@@ -266,14 +289,14 @@ export default function Calculator() {
           </table>
         </div>
 
-        {/* 표면재 및 가공비 설정 */}
-        <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px dashed #cbd5e1', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+        {/* 표면재 및 가공 부대비용 단가 */}
+        <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed #cbd5e1', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
           <div>
             <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569' }}>LPM 양면 단가 (원)</label>
             <input
               type="number"
               value={costDb['LPM_양면'] || ''}
-              onChange={(e) => handleCellCostChange('LPM_양면', Number(e.target.value))}
+              onChange={(e) => handleCellChange('LPM_양면', Number(e.target.value))}
               style={{ width: '100%', padding: '6px', marginTop: '4px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
             />
           </div>
@@ -282,7 +305,7 @@ export default function Calculator() {
             <input
               type="number"
               value={costDb['LPM_단면'] || ''}
-              onChange={(e) => handleCellCostChange('LPM_단면', Number(e.target.value))}
+              onChange={(e) => handleCellChange('LPM_단면', Number(e.target.value))}
               style={{ width: '100%', padding: '6px', marginTop: '4px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
             />
           </div>
@@ -291,7 +314,7 @@ export default function Calculator() {
             <input
               type="number"
               value={costDb['PROCESSING_BASE'] || ''}
-              onChange={(e) => handleCellCostChange('PROCESSING_BASE', Number(e.target.value))}
+              onChange={(e) => handleCellChange('PROCESSING_BASE', Number(e.target.value))}
               style={{ width: '100%', padding: '6px', marginTop: '4px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
             />
           </div>
@@ -300,17 +323,17 @@ export default function Calculator() {
             <input
               type="number"
               value={costDb['LOSS_RATE'] || ''}
-              onChange={(e) => handleCellCostChange('LOSS_RATE', Number(e.target.value))}
+              onChange={(e) => handleCellChange('LOSS_RATE', Number(e.target.value))}
               style={{ width: '100%', padding: '6px', marginTop: '4px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
             />
           </div>
         </div>
       </div>
 
-      {/* 2. 조건 선택 및 실시간 원가 / 마진 계산기 */}
+      {/* 2. 산출 조건 선택 및 실시간 분석 산출 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px', marginBottom: '32px' }}>
         <div style={{ background: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #d1d5db' }}>
-          <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: 0, marginBottom: '16px', color: '#2563eb' }}>⚙️ 견적 조건 선택 (표 단가 자동연동)</h2>
+          <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: 0, marginBottom: '16px', color: '#2563eb' }}>⚙️ 견적 조건 선택 (표 단가 실시간 연동)</h2>
           
           <div style={{ display: 'grid', gap: '12px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -321,8 +344,8 @@ export default function Calculator() {
                   onChange={(e) => {
                     const newType = e.target.value as 'MDF' | 'PB' | '합판';
                     setBoardType(newType);
-                    setThickness(BOARD_SPECS[newType].thicknesses[0]);
-                    setDensity(BOARD_SPECS[newType].densities[0]);
+                    setThickness(BOARD_CONFIG[newType].thicknesses[0]);
+                    setDensity(BOARD_CONFIG[newType].densities[0]);
                   }}
                   style={{ width: '100%', padding: '8px', marginTop: '4px', borderRadius: '4px', border: '1px solid #ccc' }}
                 >
@@ -335,7 +358,7 @@ export default function Calculator() {
               <div>
                 <label style={{ fontSize: '12px', fontWeight: 'bold' }}>두께</label>
                 <select value={thickness} onChange={(e) => setThickness(e.target.value)} style={{ width: '100%', padding: '8px', marginTop: '4px', borderRadius: '4px', border: '1px solid #ccc' }}>
-                  {BOARD_SPECS[boardType].thicknesses.map((t) => (
+                  {BOARD_CONFIG[boardType].thicknesses.map((t) => (
                     <option key={t} value={t}>{t}</option>
                   ))}
                 </select>
@@ -355,7 +378,7 @@ export default function Calculator() {
               <div>
                 <label style={{ fontSize: '12px', fontWeight: 'bold' }}>비중 규격</label>
                 <select value={density} onChange={(e) => setDensity(e.target.value)} style={{ width: '100%', padding: '6px', marginTop: '4px', borderRadius: '4px', border: '1px solid #ccc' }}>
-                  {BOARD_SPECS[boardType].densities.map((d) => (
+                  {BOARD_CONFIG[boardType].densities.map((d) => (
                     <option key={d} value={d}>{d}</option>
                   ))}
                 </select>
@@ -372,7 +395,7 @@ export default function Calculator() {
             </div>
 
             <div style={{ background: '#eff6ff', padding: '10px', borderRadius: '6px', fontSize: '13px', color: '#1e40af' }}>
-              매칭 항목: <strong>{baseSpecKey}</strong> | 단가표 적용 원판가: <strong>{boardUnitCost > 0 ? `${boardUnitCost.toLocaleString()}원` : '0원 (상단 표에서 단가 입력)'}</strong>
+              매칭 항목: <strong>{fullDensityKey}</strong> | 연동 원판가: <strong>{boardUnitCost > 0 ? `${boardUnitCost.toLocaleString()}원` : '0원 (상단 표에서 단가 입력)'}</strong>
             </div>
 
             <div>
@@ -398,9 +421,9 @@ export default function Calculator() {
 
         {/* 원가 분석 결과 */}
         <div style={{ background: '#f0fdf4', padding: '20px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
-          <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: 0, marginBottom: '16px', color: '#166534' }}>📊 산출 분석 결과</h2>
+          <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: 0, marginBottom: '16px', color: '#166534' }}>📊 당사 견적 분석</h2>
           <div style={{ background: '#fff', padding: '12px', borderRadius: '6px', marginBottom: '8px', border: '1px solid #dcfce7' }}>
-            <div style={{ fontSize: '12px', color: '#65a30d' }}>장당 제조원가 ({baseSpecKey} 기준)</div>
+            <div style={{ fontSize: '12px', color: '#65a30d' }}>장당 제조원가 ({fullDensityKey} 기준)</div>
             <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#14532d' }}>{Math.round(totalUnitCost).toLocaleString()} 원</div>
           </div>
           <div style={{ background: '#16a34a', color: '#fff', padding: '14px', borderRadius: '6px', marginBottom: '8px' }}>
