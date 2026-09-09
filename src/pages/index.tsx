@@ -61,24 +61,19 @@ interface Order {
   order_items: OrderItem[];
 }
 
-interface EstimateItem {
-  id: number;
-  itemName: string;
-  spec: string;
-  qty: number;
-  unitPrice: number;
-  memo: string;
-}
-
-// --- 보드 및 표면재 규격 체계 ---
+// --- 규격 체계 ---
 const BOARD_CONFIG = {
   MDF: {
-    thicknesses: ['2.7t', '3t', '4.5t', '6t', '9t', '12t', '15t', '18t', '20t', '22t', '23t', '25t', '28t', '30t'],
+    thicknesses: ['9t', '12t', '15t', '18t', '23t', '25t', '28t', '30t'],
     densities: ['INT', 'DL', 'D', 'R'],
   },
-  PB: {
-    thicknesses: ['9t', '12t', '15t', '18t', '20t', '22t', '23t', '25t', '28t', '30t'],
-    densities: ['주방용', '8형', '11형', '13형', '15형'],
+  'PB (국산)': {
+    thicknesses: ['12t', '15t', '18t', '20t', '23t', '28t', '30t'],
+    densities: ['주방용', '8형', '13형', '15형'],
+  },
+  'PB (수입)': {
+    thicknesses: ['9t', '12t', '15t', '18t', '23t', '28t', '30t'],
+    densities: ['태국산', '중국산'],
   },
   합판: {
     thicknesses: ['3t', '4.8t', '8.5t', '11.5t', '14.5t', '17.5t'],
@@ -97,9 +92,8 @@ const SURFACE_CONFIG: { [key: string]: { unit: '장' | 'm'; thicknesses: string[
   포일: { unit: 'm', thicknesses: ['기본'] },
 };
 
-// 📌 PDF 견적서 내 reDoor (엘데코) 전체 제품 목록 (100% 누락 없이 반영)
+// reDoor (엘데코) 전체 완제품 목록
 const REDOOR_PRODUCTS = [
-  // Special PET+LPM (Logo)
   { group: 'Special PET+LPM', code: 'RPMN-126', name: '매트 옐로우피치', spec: '18T', price: 49500, eco: 'E0' },
   { group: 'Special PET+LPM', code: 'RPMN-123', name: '매트 오렌지크림', spec: '18T', price: 49500, eco: 'E0' },
   { group: 'Special PET+LPM', code: 'RPMN-122', name: '매트 모카커피', spec: '18T', price: 49500, eco: 'E0' },
@@ -136,7 +130,7 @@ const REDOOR_PRODUCTS = [
   { group: 'Special PET+LPM', code: 'RPHG-719', name: '글로시 클린화이트', spec: '18T', price: 42500, eco: 'E0' },
   { group: 'Special PET+LPM', code: 'RPHG-731', name: '글로시 포그그레이', spec: '18T', price: 42500, eco: 'E0' },
 
-  // Premium PET+LPM (Logo)
+  // Premium PET+LPM
   { group: 'Premium PET+LPM', code: 'RPMN-721', name: '매트 미스트그린', spec: '18T', price: 41000, eco: 'E0' },
   { group: 'Premium PET+LPM', code: 'RPMN-726', name: '매트 아쿠아마린', spec: '18T', price: 41000, eco: 'E0' },
   { group: 'Premium PET+LPM', code: 'RPMN-710', name: '매트 화이트', spec: '18T', price: 41000, eco: 'E0' },
@@ -151,7 +145,7 @@ const REDOOR_PRODUCTS = [
   { group: 'Premium PET+LPM', code: 'RPMN-731', name: '매트 포그그레이', spec: '18T', price: 41000, eco: 'E0' },
   { group: 'Premium PET+LPM', code: 'RPMN-717', name: '매트 다크그레이', spec: '18T', price: 41000, eco: 'E0' },
 
-  // Premium PET+PP (Logo)
+  // Premium PET+PP
   { group: 'Premium PET+PP', code: 'RPMN-831', name: '스트라이프 포그그레이', spec: '18T', price: 54500, eco: 'E0' },
   { group: 'Premium PET+PP', code: 'RPMN-819', name: '스트라이프 클린화이트', spec: '18T', price: 54500, eco: 'E0' },
   { group: 'Premium PET+PP', code: 'RPMN-519', name: '클린화이트 스톤', spec: '18T', price: 54500, eco: 'E0' },
@@ -161,7 +155,7 @@ const REDOOR_PRODUCTS = [
   { group: 'Premium PET+PP', code: 'RPMN-711(P)', name: '매트 밀키화이트', spec: '18T', price: 39500, eco: 'E0' },
   { group: 'Premium PET+PP', code: 'RPMN-719(P)', name: '매트 클린 화이트', spec: '18T', price: 39500, eco: 'E0' },
 
-  // PP (Logo / Pattern)
+  // PP
   { group: 'PP', code: 'RPPM-509', name: '우드 앤 스톤', spec: '18T', price: 67500, eco: 'E0' },
   { group: 'PP', code: 'RPPM-514', name: '브론즈오크', spec: '18T', price: 67500, eco: 'E0' },
   { group: 'PP', code: 'RPPM-510', name: '컴포트 오크 캐러멜', spec: '18T', price: 67500, eco: 'E0' },
@@ -184,41 +178,47 @@ const REDOOR_PRODUCTS = [
 ];
 
 const INITIAL_PDF_COSTS: { [key: string]: number } = {
-  // PB 단가 (동화기업 PB)
-  'PB_12t_13형_E1': 12500,
-  'PB_15t_주방용_E1': 12500,
-  'PB_15t_13형_E1': 12500,
-  'PB_15t_13형_E0': 14000,
-  'PB_15t_15형_E0': 15000,
-  'PB_15t_13형_SE0': 16500,
-  'PB_18t_주방용_E1': 14000,
-  'PB_18t_8형_E1': 14500,
-  'PB_18t_13형_E1': 16000,
-  'PB_18t_15형_E0': 17000,
-  'PB_18t_13형_SE0': 18500,
-  'PB_20t_13형_E0': 15500,
-  'PB_23t_13형_E0': 22500,
-  'PB_23t_15형_E0': 23500,
-  'PB_28t_13형_E0': 29000,
-  'PB_30t_13형_E0': 31500,
-  'PB_30t_15형_E0': 32500,
+  // 1. PB (국산 - 동화기업)
+  'PB (국산)_12t_13형_E1': 12500,
+  'PB (국산)_15t_주방용_E1': 12500,
+  'PB (국산)_15t_13형_E1': 12500,
+  'PB (국산)_15t_13형_E0': 14000,
+  'PB (국산)_15t_15형_E0': 15000,
+  'PB (국산)_15t_13형_SE0': 16500,
+  'PB (국산)_18t_주방용_E1': 14000,
+  'PB (국산)_18t_8형_E1': 14500,
+  'PB (국산)_18t_13형_E1': 16000,
+  'PB (국산)_18t_15형_E0': 17000,
+  'PB (국산)_18t_13형_SE0': 18500,
+  'PB (국산)_20t_13형_E0': 15500,
+  'PB (국산)_23t_13형_E0': 22500,
+  'PB (국산)_23t_15형_E0': 23500,
+  'PB (국산)_28t_13형_E0': 29000,
+  'PB (국산)_30t_13형_E0': 31500,
+  'PB (국산)_30t_15형_E0': 32500,
 
-  // MDF 단가 (태국/중국 원보드/케이원)
+  // 2. PB (수입 - 태국/중국)
+  'PB (수입)_12t_중국산_E1': 8600,
+  'PB (수입)_12t_중국산_E0': 9000,
+  'PB (수입)_15t_태국산_E1': 9700,
+  'PB (수입)_15t_태국산_E0': 10400,
+  'PB (수입)_15t_중국산_E1': 9700,
+  'PB (수입)_15t_중국산_E0': 10400,
+  'PB (수입)_18t_태국산_E1': 11700,
+  'PB (수입)_18t_태국산_E0': 12500,
+  'PB (수입)_18t_중국산_E1': 11700,
+  'PB (수입)_18t_중국산_E0': 12500,
+
+  // 3. MDF
   'MDF_9t_INT_E1': 7000,
-  'MDF_12t_INT_E1': 8600,
-  'MDF_12t_INT_E0': 9000,
-  'MDF_15t_INT_E1': 9700,
-  'MDF_15t_INT_E0': 10400,
-  'MDF_18t_INT_E1': 11700,
-  'MDF_18t_INT_E0': 12500,
-  'MDF_23t_INT_E1': 15200,
-  'MDF_23t_INT_E0': 16000,
-  'MDF_28t_INT_E1': 19500,
-  'MDF_28t_INT_E0': 20500,
-  'MDF_30t_INT_E1': 21000,
-  'MDF_30t_INT_E0': 22000,
+  'MDF_12t_INT_E1': 8800,
+  'MDF_12t_INT_E0': 9200,
+  'MDF_15t_INT_E1': 10000,
+  'MDF_15t_INT_E0': 10600,
+  'MDF_18t_INT_E1': 12000,
+  'MDF_18t_INT_E0': 12700,
 
-  // 표면재 단가
+  // 4. 표면재 기본 단가
   'SURFACE_PET_0.2t': 3500,
   'SURFACE_PVC_0.2t': 2800,
   'SURFACE_PP_0.2t': 3200,
@@ -500,12 +500,13 @@ function OrderSection({ userRole, loggedInCompany, openLogin }: { userRole: stri
                     const newType = e.target.value as keyof typeof BOARD_CONFIG;
                     const newItems = [...items];
                     newItems[index].board_type = newType;
-                    newItems[index].thickness = BOARD_CONFIG[newType].thicknesses[0];
-                    newItems[index].density = BOARD_CONFIG[newType].densities[0];
+                    newItems[index].thickness = BOARD_CONFIG[newType]?.thicknesses[0] || '18t';
+                    newItems[index].density = BOARD_CONFIG[newType]?.densities[0] || 'INT';
                     setItems(newItems);
                   }} style={{ width: '100%', padding: '6px' }}>
                     <option value="MDF">MDF</option>
-                    <option value="PB">PB</option>
+                    <option value="PB (국산)">PB (국산)</option>
+                    <option value="PB (수입)">PB (수입)</option>
                     <option value="합판">합판</option>
                   </select>
                 </div>
@@ -516,7 +517,7 @@ function OrderSection({ userRole, loggedInCompany, openLogin }: { userRole: stri
                     newItems[index].thickness = e.target.value;
                     setItems(newItems);
                   }} style={{ width: '100%', padding: '6px' }}>
-                    {currentConfig.thicknesses.map((t) => <option key={t} value={t}>{t}</option>)}
+                    {currentConfig?.thicknesses.map((t) => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
                 <div>
@@ -526,7 +527,7 @@ function OrderSection({ userRole, loggedInCompany, openLogin }: { userRole: stri
                     newItems[index].density = e.target.value;
                     setItems(newItems);
                   }} style={{ width: '100%', padding: '6px' }}>
-                    {currentConfig.densities.map((d) => <option key={d} value={d}>{d}</option>)}
+                    {currentConfig?.densities.map((d) => <option key={d} value={d}>{d}</option>)}
                   </select>
                 </div>
                 <div>
@@ -712,19 +713,36 @@ function AdminSection() {
 }
 
 // ==========================================
-// 4. 원가 단가 관리 & 실시간 산출기 탭 (reDoor 전체 전용 단가표 연동)
+// 4. 원가 단가 관리 & 실시간 산출기 탭 (드롭다운 + 실시간 필터 검색 양방향 지원)
 // ==========================================
 function CalculatorSection() {
   const [costDb, setCostDb] = useState<{ [key: string]: number }>(INITIAL_PDF_COSTS);
-  
-  const [tableMainTab, setTableMainTab] = useState<'board' | 'surface' | 'reDoor'>('reDoor');
-  const [tableBoard, setTableBoard] = useState<'MDF' | 'PB' | '합판'>('MDF');
-  const [tableDensity, setTableDensity] = useState<string>('INT');
+
+  // 상단 단가표 메인 탭
+  const [tableMainTab, setTableMainTab] = useState<'reDoor' | 'board' | 'surface'>('reDoor');
+  const [tableBoard, setTableBoard] = useState<'MDF' | 'PB (국산)' | 'PB (수입)' | '합판'>('PB (국산)');
+  const [tableDensity, setTableDensity] = useState<string>('주방용');
   const [tableSurface, setTableSurface] = useState<string>('PET');
 
-  const [boardType, setBoardType] = useState<'MDF' | 'PB' | '합판'>('MDF');
+  // 상단 reDoor 단가표 필터용 상태
+  const [tableRedoorGroup, setTableRedoorGroup] = useState<string>('전체');
+  const [tableRedoorSearch, setTableRedoorSearch] = useState<string>('');
+
+  // 하단 견적 계산기 reDoor 선택 모드 ('select': 대분류 드롭다운 방식, 'search': 실시간 검색/필터링 방식)
+  const [calcMode, setCalcMode] = useState<'custom' | 'reDoor'>('reDoor');
+  const [redoorSelectType, setRedoorSelectType] = useState<'dropdown' | 'filter'>('dropdown');
+
+  // 드롭다운 방식 선택 상태
+  const [selectedGroup, setSelectedGroup] = useState<string>('Special PET+LPM');
+  const [selectedRedoorCode, setSelectedRedoorCode] = useState<string>('RPMN-110');
+
+  // 실시간 필터 검색 방식 상태
+  const [calcFilterKeyword, setCalcFilterKeyword] = useState<string>('');
+
+  // 일반 조합 산출 조건
+  const [boardType, setBoardType] = useState<'MDF' | 'PB (국산)' | 'PB (수입)' | '합판'>('PB (국산)');
   const [thickness, setThickness] = useState('18t');
-  const [density, setDensity] = useState('INT');
+  const [density, setDensity] = useState('13형');
   const [ecoGrade, setEcoGrade] = useState('E1');
 
   const [selectedSurfaceType, setSelectedSurfaceType] = useState('PET');
@@ -738,12 +756,24 @@ function CalculatorSection() {
   }, []);
 
   useEffect(() => {
-    setTableDensity(BOARD_CONFIG[tableBoard].densities[0]);
+    if (BOARD_CONFIG[tableBoard]) {
+      setTableDensity(BOARD_CONFIG[tableBoard].densities[0]);
+    }
   }, [tableBoard]);
 
   useEffect(() => {
-    setSelectedSurfaceThick(SURFACE_CONFIG[selectedSurfaceType].thicknesses[0]);
+    if (SURFACE_CONFIG[selectedSurfaceType]) {
+      setSelectedSurfaceThick(SURFACE_CONFIG[selectedSurfaceType].thicknesses[0]);
+    }
   }, [selectedSurfaceType]);
+
+  // 대분류 드롭다운 변경 시 소분류 품목 자동 갱신
+  useEffect(() => {
+    const groupProds = REDOOR_PRODUCTS.filter((p) => p.group === selectedGroup);
+    if (groupProds.length > 0) {
+      setSelectedRedoorCode(groupProds[0].code);
+    }
+  }, [selectedGroup]);
 
   const fetchCostSettings = async () => {
     const { data } = await supabase.from('cost_settings').select('*');
@@ -764,29 +794,56 @@ function CalculatorSection() {
     alert('원가 단가 설정이 DB에 성공적으로 저장되었습니다!');
   };
 
-  const fullDensityKey = `${boardType}_${thickness}_${density}_${ecoGrade}`;
-  const baseGradeKey = `${boardType}_${thickness}_${ecoGrade}`;
-  const boardUnitCost = costDb[fullDensityKey] ?? costDb[baseGradeKey] ?? 0;
+  // 대분류 카테고리 고유값 추출
+  const reDoorGroups = Array.from(new Set(REDOOR_PRODUCTS.map((p) => p.group)));
 
-  const surfaceKey = `SURFACE_${selectedSurfaceType}_${selectedSurfaceThick}`;
-  const rawSurfaceCost = costDb[surfaceKey] || 0;
-  const surfaceInfo = SURFACE_CONFIG[selectedSurfaceType];
+  // 상단 단가표 테이블 필터링 데이터
+  const filteredTableRedoor = REDOOR_PRODUCTS.filter((p) => {
+    const matchGroup = tableRedoorGroup === '전체' || p.group === tableRedoorGroup;
+    const matchSearch = p.code.toLowerCase().includes(tableRedoorSearch.toLowerCase()) || p.name.includes(tableRedoorSearch);
+    return matchGroup && matchSearch;
+  });
 
-  let calculatedSurfaceCost = 0;
-  if (surfaceInfo?.unit === '장') {
-    calculatedSurfaceCost = rawSurfaceCost * (processingType === '양면' ? 1 : 0.6);
+  // 하단 계산기 검색 방식 필터링 데이터
+  const filteredCalcRedoor = REDOOR_PRODUCTS.filter((p) => {
+    return p.code.toLowerCase().includes(calcFilterKeyword.toLowerCase()) || p.name.includes(calcFilterKeyword);
+  });
+
+  // 실시간 단가 산출 계산 로직
+  let baseCostPerItem = 0;
+  let currentProductTitle = '';
+
+  if (calcMode === 'reDoor') {
+    const targetProd = REDOOR_PRODUCTS.find((p) => p.code === selectedRedoorCode) || REDOOR_PRODUCTS[0];
+    baseCostPerItem = targetProd.price;
+    currentProductTitle = `[reDoor] ${targetProd.name} (${targetProd.code} - ${targetProd.spec})`;
   } else {
-    calculatedSurfaceCost = rawSurfaceCost * 2.5 * (processingType === '양면' ? 2 : 1);
+    const fullDensityKey = `${boardType}_${thickness}_${density}_${ecoGrade}`;
+    const baseGradeKey = `${boardType}_${thickness}_${ecoGrade}`;
+    const boardUnitCost = costDb[fullDensityKey] ?? costDb[baseGradeKey] ?? 0;
+
+    const surfaceKey = `SURFACE_${selectedSurfaceType}_${selectedSurfaceThick}`;
+    const rawSurfaceCost = costDb[surfaceKey] || 0;
+    const surfaceInfo = SURFACE_CONFIG[selectedSurfaceType];
+
+    let calculatedSurfaceCost = 0;
+    if (surfaceInfo?.unit === '장') {
+      calculatedSurfaceCost = rawSurfaceCost * (processingType === '양면' ? 1 : 0.6);
+    } else {
+      calculatedSurfaceCost = rawSurfaceCost * 2.5 * (processingType === '양면' ? 2 : 1);
+    }
+
+    const processingUnitCost = costDb['PROCESSING_BASE'] || 3000;
+    const lossRate = costDb['LOSS_RATE'] || 5;
+
+    baseCostPerItem = (boardUnitCost + calculatedSurfaceCost + processingUnitCost) * (1 + lossRate / 100);
+    currentProductTitle = `${boardType} ${thickness} + ${selectedSurfaceType} (${processingType})`;
   }
 
-  const processingUnitCost = costDb['PROCESSING_BASE'] || 3000;
-  const lossRate = costDb['LOSS_RATE'] || 5;
-
-  const baseCostPerItem = (boardUnitCost + calculatedSurfaceCost + processingUnitCost) * (1 + lossRate / 100);
-  const recommendedUnitPrice = Math.ceil((baseCostPerItem / (1 - targetMargin / 100)) / 100) * 100;
+  const recommendedUnitPrice = calcMode === 'reDoor' ? baseCostPerItem : Math.ceil((baseCostPerItem / (1 - targetMargin / 100)) / 100) * 100;
   const totalPrice = recommendedUnitPrice * quantity;
-  const totalProfit = totalPrice - baseCostPerItem * quantity;
-  const actualMarginRate = totalPrice > 0 ? ((totalProfit / totalPrice) * 100).toFixed(1) : '0';
+  const totalProfit = calcMode === 'reDoor' ? 0 : totalPrice - baseCostPerItem * quantity;
+  const actualMarginRate = calcMode === 'reDoor' ? '0.0' : totalPrice > 0 ? ((totalProfit / totalPrice) * 100).toFixed(1) : '0';
 
   return (
     <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
@@ -797,24 +854,43 @@ function CalculatorSection() {
         </button>
       </div>
 
+      {/* 상단 단가 매트릭스 탭 */}
       <div style={{ border: '1px solid #cbd5e1', padding: '16px', borderRadius: '8px', marginBottom: '24px', background: '#fff' }}>
         <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '2px solid #e2e8f0', paddingBottom: '10px' }}>
           <button onClick={() => setTableMainTab('reDoor')} style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', background: tableMainTab === 'reDoor' ? '#7c3aed' : '#f1f5f9', color: tableMainTab === 'reDoor' ? '#fff' : '#334155', fontWeight: 'bold', cursor: 'pointer' }}>
-            1. reDoor 완제품 단가표 (PET / PP 전 품목 {REDOOR_PRODUCTS.length}개)
+            1. reDoor 완제품 단가표 (PET/PP 전 품목 {REDOOR_PRODUCTS.length}개)
           </button>
           <button onClick={() => setTableMainTab('board')} style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', background: tableMainTab === 'board' ? '#1e40af' : '#f1f5f9', color: tableMainTab === 'board' ? '#fff' : '#334155', fontWeight: 'bold', cursor: 'pointer' }}>
-            2. 보드 원판 단가표 (MDF / PB)
+            2. 보드 원판 단가표 (PB 국산/수입 / MDF / 합판)
           </button>
           <button onClick={() => setTableMainTab('surface')} style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', background: tableMainTab === 'surface' ? '#0284c7' : '#f1f5f9', color: tableMainTab === 'surface' ? '#fff' : '#334155', fontWeight: 'bold', cursor: 'pointer' }}>
             3. 표면재 단가표 (m당 자재)
           </button>
         </div>
 
-        {/* 1. reDoor 전체 완제품 단가표 */}
+        {/* 1. reDoor 완제품 단가표 (드롭다운 + 검색 필터 적용) */}
         {tableMainTab === 'reDoor' && (
           <div>
-            <h4 style={{ margin: '0 0 10px 0', color: '#6d28d9' }}>✨ reDoor (Special/Premium PET+LPM, PP) 완제품 전체 공급 단가표 ({REDOOR_PRODUCTS.length}개)</h4>
-            <div style={{ overflowX: 'auto', maxHeight: '500px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '10px' }}>
+              <h4 style={{ margin: 0, color: '#6d28d9' }}>✨ reDoor 완제품 공급 단가표 ({filteredTableRedoor.length}개 표시)</h4>
+
+              {/* 검색 및 필터 영역 */}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <select value={tableRedoorGroup} onChange={(e) => setTableRedoorGroup(e.target.value)} style={{ padding: '6px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '12px' }}>
+                  <option value="전체">전체 카테고리</option>
+                  {reDoorGroups.map((g) => <option key={g} value={g}>{g}</option>)}
+                </select>
+                <input
+                  type="text"
+                  placeholder="제품코드 또는 제품명 검색..."
+                  value={tableRedoorSearch}
+                  onChange={(e) => setTableRedoorSearch(e.target.value)}
+                  style={{ padding: '6px 10px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '12px', width: '200px' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ overflowX: 'auto', maxHeight: '420px' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                 <thead style={{ position: 'sticky', top: 0, background: '#f5f3ff', zIndex: 1 }}>
                   <tr style={{ borderTop: '2px solid #7c3aed' }}>
@@ -827,7 +903,7 @@ function CalculatorSection() {
                   </tr>
                 </thead>
                 <tbody>
-                  {REDOOR_PRODUCTS.map((prod) => (
+                  {filteredTableRedoor.map((prod) => (
                     <tr key={prod.code + prod.name}>
                       <td style={{ padding: '6px', border: '1px solid #ddd', textAlign: 'center', fontWeight: 'bold', color: '#6d28d9' }}>{prod.group}</td>
                       <td style={{ padding: '6px', border: '1px solid #ddd', textAlign: 'center', fontWeight: 'bold' }}>{prod.code}</td>
@@ -847,7 +923,7 @@ function CalculatorSection() {
         {tableMainTab === 'board' && (
           <div>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
-              {(['MDF', 'PB', '합판'] as const).map((tab) => (
+              {(['PB (국산)', 'PB (수입)', 'MDF', '합판'] as const).map((tab) => (
                 <button key={tab} onClick={() => setTableBoard(tab)} style={{ padding: '6px 14px', background: tableBoard === tab ? '#1e40af' : '#f8fafc', color: tableBoard === tab ? '#fff' : '#334155', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
                   {tab} 단가표
                 </button>
@@ -856,7 +932,7 @@ function CalculatorSection() {
 
             <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', alignItems: 'center', background: '#f8fafc', padding: '6px 10px', borderRadius: '6px' }}>
               <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569' }}>비중 필터:</span>
-              {BOARD_CONFIG[tableBoard].densities.map((d) => (
+              {BOARD_CONFIG[tableBoard]?.densities.map((d) => (
                 <button key={d} onClick={() => setTableDensity(d)} style={{ padding: '4px 10px', background: tableDensity === d ? '#2563eb' : '#fff', color: tableDensity === d ? '#fff' : '#333', border: '1px solid #ccc', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold' }}>
                   {d}
                 </button>
@@ -873,7 +949,7 @@ function CalculatorSection() {
                   </tr>
                 </thead>
                 <tbody>
-                  {BOARD_CONFIG[tableBoard].thicknesses.map((th) => (
+                  {BOARD_CONFIG[tableBoard]?.thicknesses.map((th) => (
                     <tr key={th}>
                       <td style={{ padding: '6px', border: '1px solid #ddd', textAlign: 'center', fontWeight: 'bold', background: '#f8fafc' }}>{th}</td>
                       <td style={{ padding: '6px', border: '1px solid #ddd', textAlign: 'center', color: '#2563eb', fontWeight: 'bold' }}>{tableDensity}</td>
@@ -915,7 +991,7 @@ function CalculatorSection() {
                 </tr>
               </thead>
               <tbody>
-                {SURFACE_CONFIG[tableSurface].thicknesses.map((th) => {
+                {SURFACE_CONFIG[tableSurface]?.thicknesses.map((th) => {
                   const sk = `SURFACE_${tableSurface}_${th}`;
                   const sc = costDb[sk] ?? 0;
                   return (
@@ -935,82 +1011,174 @@ function CalculatorSection() {
         )}
       </div>
 
-      {/* 하단 실시간 계산기 */}
+      {/* 하단 견적 조건 선택 및 실시간 산출 결과 연동 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
         <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-          <h3 style={{ fontSize: '15px', marginTop: 0, color: '#2563eb' }}>⚙️ 견적 조건 선택</h3>
-          <div style={{ display: 'grid', gap: '8px', fontSize: '12px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
-              <div>
-                <label style={{ fontWeight: 'bold' }}>보드</label>
-                <select value={boardType} onChange={(e) => setBoardType(e.target.value as any)} style={{ width: '100%', padding: '6px' }}>
-                  <option value="MDF">MDF</option>
-                  <option value="PB">PB</option>
-                  <option value="합판">합판</option>
-                </select>
-              </div>
-              <div>
-                <label style={{ fontWeight: 'bold' }}>두께</label>
-                <select value={thickness} onChange={(e) => setThickness(e.target.value)} style={{ width: '100%', padding: '6px' }}>
-                  {BOARD_CONFIG[boardType].thicknesses.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{ fontWeight: 'bold' }}>비중</label>
-                <select value={density} onChange={(e) => setDensity(e.target.value)} style={{ width: '100%', padding: '6px' }}>
-                  {BOARD_CONFIG[boardType].densities.map((d) => <option key={d} value={d}>{d}</option>)}
-                </select>
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
-              <div>
-                <label style={{ fontWeight: 'bold' }}>표면재</label>
-                <select value={selectedSurfaceType} onChange={(e) => setSelectedSurfaceType(e.target.value)} style={{ width: '100%', padding: '6px' }}>
-                  {Object.keys(SURFACE_CONFIG).map((s) => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{ fontWeight: 'bold' }}>두께</label>
-                <select value={selectedSurfaceThick} onChange={(e) => setSelectedSurfaceThick(e.target.value)} style={{ width: '100%', padding: '6px' }}>
-                  {SURFACE_CONFIG[selectedSurfaceType].thicknesses.map((th) => <option key={th} value={th}>{th}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{ fontWeight: 'bold' }}>가공</label>
-                <select value={processingType} onChange={(e) => setProcessingType(e.target.value as any)} style={{ width: '100%', padding: '6px' }}>
-                  <option value="양면">양면</option>
-                  <option value="단면">단면</option>
-                </select>
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              <div>
-                <label style={{ fontWeight: 'bold' }}>수량 (장)</label>
-                <input type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} style={{ width: '100%', padding: '6px' }} />
-              </div>
-              <div>
-                <label style={{ fontWeight: 'bold' }}>목표 마진율 (%)</label>
-                <input type="number" value={targetMargin} onChange={(e) => setTargetMargin(Number(e.target.value))} style={{ width: '100%', padding: '6px' }} />
-              </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <h3 style={{ fontSize: '15px', margin: 0, color: '#2563eb' }}>⚙️ 견적 조건 선택</h3>
+            <div style={{ display: 'flex', gap: '4px' }}>
+              <button onClick={() => setCalcMode('reDoor')} style={{ padding: '4px 8px', borderRadius: '4px', border: 'none', background: calcMode === 'reDoor' ? '#7c3aed' : '#cbd5e1', color: '#fff', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>
+                reDoor 완제품
+              </button>
+              <button onClick={() => setCalcMode('custom')} style={{ padding: '4px 8px', borderRadius: '4px', border: 'none', background: calcMode === 'custom' ? '#2563eb' : '#cbd5e1', color: '#fff', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>
+                일반 가공 조합
+              </button>
             </div>
           </div>
+
+          {calcMode === 'reDoor' ? (
+            <div style={{ display: 'grid', gap: '12px', fontSize: '12px' }}>
+              {/* 드롭다운 vs 실시간 필터 전환 스위치 */}
+              <div style={{ display: 'flex', gap: '6px', background: '#f1f5f9', padding: '4px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                <button
+                  type="button"
+                  onClick={() => setRedoorSelectType('dropdown')}
+                  style={{ flex: 1, padding: '6px', border: 'none', borderRadius: '4px', background: redoorSelectType === 'dropdown' ? '#fff' : 'transparent', fontWeight: 'bold', cursor: 'pointer', color: redoorSelectType === 'dropdown' ? '#7c3aed' : '#64748b', boxShadow: redoorSelectType === 'dropdown' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
+                >
+                  ▼ 대분류 드롭다운 방식
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRedoorSelectType('filter')}
+                  style={{ flex: 1, padding: '6px', border: 'none', borderRadius: '4px', background: redoorSelectType === 'filter' ? '#fff' : 'transparent', fontWeight: 'bold', cursor: 'pointer', color: redoorSelectType === 'filter' ? '#7c3aed' : '#64748b', boxShadow: redoorSelectType === 'filter' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
+                >
+                  🔍 실시간 검색/필터 방식
+                </button>
+              </div>
+
+              {/* 1. 드롭다운 선택 방식 */}
+              {redoorSelectType === 'dropdown' && (
+                <div style={{ display: 'grid', gap: '8px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '4px', color: '#475569' }}>1차: 제품 그룹 선택 (대분류)</label>
+                    <select value={selectedGroup} onChange={(e) => setSelectedGroup(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1', fontWeight: 'bold' }}>
+                      {reDoorGroups.map((g) => <option key={g} value={g}>{g}</option>)}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '4px', color: '#475569' }}>2차: 세부 제품 선택 (소분류)</label>
+                    <select value={selectedRedoorCode} onChange={(e) => setSelectedRedoorCode(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #7c3aed', fontWeight: 'bold', color: '#6d28d9' }}>
+                      {REDOOR_PRODUCTS.filter((p) => p.group === selectedGroup).map((prod) => (
+                        <option key={prod.code + prod.name} value={prod.code}>
+                          {prod.code} - {prod.name} ({prod.price.toLocaleString()}원)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* 2. 실시간 키워드 필터 검색 방식 */}
+              {redoorSelectType === 'filter' && (
+                <div style={{ display: 'grid', gap: '8px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '4px', color: '#475569' }}>제품 검색 필터 (코드 또는 제품명)</label>
+                    <input
+                      type="text"
+                      placeholder="예: 110, 화이트, 710, PP..."
+                      value={calcFilterKeyword}
+                      onChange={(e) => setCalcFilterKeyword(e.target.value)}
+                      style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', fontWeight: 'bold' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '4px', color: '#475569' }}>검색 결과 선택 ({filteredCalcRedoor.length}건)</label>
+                    <select value={selectedRedoorCode} onChange={(e) => setSelectedRedoorCode(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #7c3aed', fontWeight: 'bold', color: '#6d28d9' }}>
+                      {filteredCalcRedoor.map((prod) => (
+                        <option key={prod.code + prod.name} value={prod.code}>
+                          [{prod.group}] {prod.code} - {prod.name} ({prod.price.toLocaleString()}원)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '4px' }}>수량 (장)</label>
+                <input type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid #ccc' }} />
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: '8px', fontSize: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
+                <div>
+                  <label style={{ fontWeight: 'bold' }}>보드 종류</label>
+                  <select value={boardType} onChange={(e) => setBoardType(e.target.value as any)} style={{ width: '100%', padding: '6px' }}>
+                    <option value="PB (국산)">PB (국산)</option>
+                    <option value="PB (수입)">PB (수입)</option>
+                    <option value="MDF">MDF</option>
+                    <option value="합판">합판</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontWeight: 'bold' }}>두께</label>
+                  <select value={thickness} onChange={(e) => setThickness(e.target.value)} style={{ width: '100%', padding: '6px' }}>
+                    {BOARD_CONFIG[boardType]?.thicknesses.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontWeight: 'bold' }}>비중</label>
+                  <select value={density} onChange={(e) => setDensity(e.target.value)} style={{ width: '100%', padding: '6px' }}>
+                    {BOARD_CONFIG[boardType]?.densities.map((d) => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
+                <div>
+                  <label style={{ fontWeight: 'bold' }}>표면재</label>
+                  <select value={selectedSurfaceType} onChange={(e) => setSelectedSurfaceType(e.target.value)} style={{ width: '100%', padding: '6px' }}>
+                    {Object.keys(SURFACE_CONFIG).map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontWeight: 'bold' }}>두께</label>
+                  <select value={selectedSurfaceThick} onChange={(e) => setSelectedSurfaceThick(e.target.value)} style={{ width: '100%', padding: '6px' }}>
+                    {SURFACE_CONFIG[selectedSurfaceType]?.thicknesses.map((th) => <option key={th} value={th}>{th}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontWeight: 'bold' }}>가공</label>
+                  <select value={processingType} onChange={(e) => setProcessingType(e.target.value as any)} style={{ width: '100%', padding: '6px' }}>
+                    <option value="양면">양면</option>
+                    <option value="단면">단면</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <div>
+                  <label style={{ fontWeight: 'bold' }}>수량 (장)</label>
+                  <input type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} style={{ width: '100%', padding: '6px' }} />
+                </div>
+                <div>
+                  <label style={{ fontWeight: 'bold' }}>목표 마진율 (%)</label>
+                  <input type="number" value={targetMargin} onChange={(e) => setTargetMargin(Number(e.target.value))} style={{ width: '100%', padding: '6px' }} />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div style={{ background: '#f0fdf4', padding: '16px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
           <h3 style={{ fontSize: '15px', marginTop: 0, color: '#166534' }}>📊 실시간 연동 원가 산출 결과</h3>
+          <div style={{ fontSize: '12px', color: '#475569', marginBottom: '8px', fontWeight: 'bold' }}>
+            {currentProductTitle}
+          </div>
           <div style={{ marginBottom: '8px' }}>
-            <div style={{ fontSize: '12px', color: '#65a30d' }}>장당 제조원가</div>
+            <div style={{ fontSize: '12px', color: '#65a30d' }}>장당 원가 단가</div>
             <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#14532d' }}>{Math.round(baseCostPerItem).toLocaleString()} 원</div>
           </div>
           <div style={{ background: '#16a34a', color: '#fff', padding: '12px', borderRadius: '6px', marginBottom: '8px' }}>
-            <div style={{ fontSize: '12px', opacity: 0.9 }}>추천 판매 단가 (장당)</div>
+            <div style={{ fontSize: '12px', opacity: 0.9 }}>최종 공급 단가 (장당)</div>
             <div style={{ fontSize: '22px', fontWeight: 'bold' }}>{recommendedUnitPrice.toLocaleString()} 원</div>
           </div>
           <div style={{ background: '#fff', padding: '10px', borderRadius: '6px', border: '1px solid #22c55e' }}>
-            <div style={{ fontSize: '12px', color: '#15803d' }}>예상 총 이익금 (마진율)</div>
-            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#166534' }}>+{totalProfit.toLocaleString()} 원 ({actualMarginRate}%)</div>
+            <div style={{ fontSize: '12px', color: '#15803d' }}>총 발주 공급 금액 ({quantity}장 기준)</div>
+            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#166534' }}>{totalPrice.toLocaleString()} 원</div>
           </div>
         </div>
       </div>
